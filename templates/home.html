@@ -2,8 +2,6 @@
 
 {% block content %}
     <div class="welcome-container">
-
-        <!-- Вывод сообщений об ошибках -->
         {% if messages %}
             <div class="messages">
                 {% for message in messages %}
@@ -13,18 +11,19 @@
                 {% endfor %}
             </div>
         {% endif %}
-
+<h3>Ваш пользователь Windows: <strong class="windows-user">{{ windows_user }}</strong></h3>
         {% if user.is_authenticated %}
             <h2 class="welcome-title">Добро пожаловать!</h2>
-            <h3>Вы вошли в систему как пользователь <strong class="user-log ">{{ user.username }}</strong></h3>
+            <h3>Вы вошли в систему как пользователь <strong class="user-log">{{ user.username }}</strong></h3>
+
+            
+
             {% if user.is_superuser is not True %}
                 <h3>Если вам недоступен функционал проекта, пожалуйста, обратитесь к администратору</h3>
             {% endif %}
         {% else %}
             <h2 class="welcome-title">Вы не вошли в систему!</h2>
-            <h3>Пожалуйста,
-                <a href="{% url 'login' %}">войдите</a> или
-                <a href="{% url 'register' %}">зарегистрируйтесь</a></h3>
+            <h3>Пожалуйста, <a href="{% url 'login' %}">войдите</a> или <a href="{% url 'register' %}">зарегистрируйтесь</a></h3>
         {% endif %}
     </div>
 {% endblock %}

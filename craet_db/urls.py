@@ -19,7 +19,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path
 from django.contrib.auth import views as auth_views
-from db_crp.views import home, register, logout_view
+from db_crp.views import home, register, logout_view, get_windows_user
 from db_crp.views_group import group_list, group_create, group_edit, group_delete, group_info, groups_edit_privileges, groups_edit_privileges_tables
 from db_crp.views_setting import settings_info, audit_log, export_audit_log, session_list, logout_user, settings_project
 from db_crp.views_user import user_list, user_create, user_info, user_edit, user_delete
@@ -60,6 +60,8 @@ urlpatterns = [
     path('database_connect/', database_connect, name='database_connect'),  # Подключение к базе данных
     path('database_edit/<int:db_id>/', database_edit, name='database_edit'),  # Редактирование подключения к базе данных
     path('database_delete/<int:db_id>/', database_delete, name='database_delete'),  # Удалить подключения к базе данных
+
+    path('get_windows_user/', get_windows_user, name='get_windows_user'),
 
 ]
 

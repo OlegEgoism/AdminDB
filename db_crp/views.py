@@ -11,7 +11,8 @@ User = get_user_model()
 
 def home(request):
     """Главная"""
-    return render(request, 'home.html')
+    windows_user = getpass.getuser()  # Получаем имя пользователя Windows
+    return render(request, 'home.html', {'windows_user': windows_user})
 
 
 def register(request):
@@ -40,3 +41,15 @@ def logout_view(request):
     """Выход пользователя"""
     logout(request)
     return redirect('home')
+
+
+
+import os
+import getpass
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+
+@login_required
+def get_windows_user(request):
+    username = getpass.getuser()  # Или os.getlogin()
+    return JsonResponse({"username": username})

@@ -1,14 +1,12 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="ru">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Главная{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
 </head>
-
 <body>
 <header>
     <nav>
@@ -27,11 +25,23 @@
         {% endif %}
     </nav>
 </header>
+
 <main>
-    {% block content %}{% endblock %}
+    {% block content %}
+    <button id="getWindowsUser">Получить пользователя Windows</button>
+    <p id="windowsUser"></p>
+
+    <script>
+        document.getElementById("getWindowsUser").addEventListener("click", function() {
+            fetch("{% url 'get_windows_user' %}")
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("windowsUser").innerText = "Пользователь Windows: " + data.username;
+            })
+            .catch(error => console.error("Ошибка:", error));
+        });
+    </script>
+    {% endblock %}
 </main>
 </body>
-
 </html>
-
-
