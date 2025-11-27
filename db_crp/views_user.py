@@ -361,15 +361,17 @@ def user_edit(request, db_id, username):
         deleted_groups = current_groups - selected_groups
         new_groups = selected_groups - current_groups
         for groupname in deleted_groups:
-            cursor.execute(f"REVOKE {groupname} FROM {username};")
-            message = edit_user_messages_delete_group_success(username, groupname)
-            messages.success(request, message)
-            create_audit_log(user_requester, 'delete', 'user', user_requester, message)
+            if groupname.strip():
+                cursor.execute(f"REVOKE {groupname} FROM {username};")
+                message = edit_user_messages_delete_group_success(username, groupname)
+                messages.success(request, message)
+                create_audit_log(user_requester, 'delete', 'user', user_requester, message)
         for groupname in new_groups:
-            cursor.execute(f"GRANT {groupname} TO {username};")
-            message = edit_user_messages_add_group_success(username, groupname)
-            messages.success(request, message)
-            create_audit_log(user_requester, 'create', 'user', user_requester, message)
+            if groupname.strip():
+                cursor.execute(f"GRANT {groupname} TO {username};")
+                message = edit_user_messages_add_group_success(username, groupname)
+                messages.success(request, message)
+                create_audit_log(user_requester, 'create', 'user', user_requester, message)
         conn.commit()
         cursor.close()
         conn.close()

@@ -21,8 +21,8 @@
         <form method="post" id="user-edit-form">
             {% csrf_token %}
             <div class="info-item">
-            <label for="email">Email:</label>
-            <input type="email" name="email" id="email" value="{{ user_email }}" placeholder="Введите email">
+                <label for="email">Email:</label>
+                <input type="email" name="email" id="email" value="{{ user_email }}" placeholder="Введите email">
 
             </div>
             <div class="info-item">
@@ -114,26 +114,49 @@
 
         function drop(event, targetId) {
             event.preventDefault();
-            if (draggedElement) {
-                const targetList = document.getElementById(targetId);
-                const sourceList = draggedElement.parentNode;
+            const targetList = document.getElementById(targetId);
+            const sourceList = draggedElement.parentNode;
 
-                if (targetList !== sourceList) {
-                    targetList.appendChild(draggedElement);
+            // Удалить рамку при завершении drop
+            targetList.classList.remove("drag-over");
 
-                    if (sourceList.id === 'user-groups' && targetList.id === 'available-groups') {
-                        deletedGroups.push(draggedElement.textContent);
-                    }
+            if (draggedElement && targetList !== sourceList) {
+                targetList.appendChild(draggedElement);
+
+                if (sourceList.id === 'user-groups' && targetList.id === 'available-groups') {
+                    deletedGroups.push(draggedElement.textContent);
                 }
-                draggedElement = null;
             }
+            draggedElement = null;
         }
 
-        document.getElementById('user-edit-form').addEventListener('submit', () => {
-            const selectedGroups = Array.from(document.getElementById('user-groups').children)
-                .map(item => item.textContent);
-            document.getElementById('selected-groups').value = selectedGroups.join(',');
-            document.getElementById('deleted-groups').value = deletedGroups.join(',');
+        function addDragListeners(listId) {
+            const list = document.getElementById(listId);
+
+            list.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                list.classList.add("drag-over");
+            });
+
+            list.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                list.classList.remove("drag-over");
+            });
+
+            list.addEventListener('drop', (e) => {
+                list.classList.remove("drag-over");
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            addDragListeners("user-groups");
+            addDragListeners("available-groups");  // ← это ключевая строка
+            document.getElementById('user-edit-form').addEventListener('submit', () => {
+                const selectedGroups = Array.from(document.getElementById('user-groups').children)
+                    .map(item => item.textContent);
+                document.getElementById('selected-groups').value = selectedGroups.join(',');
+                document.getElementById('deleted-groups').value = deletedGroups.join(',');
+            });
         });
     </script>
 {% endblock %}

@@ -460,3 +460,16 @@ main {
 .schema-item a:hover {
     background: #e9ecef;
 }
+
+
+.group-list {
+    min-height: 150px;
+    border: 2px solid transparent;
+    padding: 10px;
+    transition: border 0.2s ease, background-color 0.2s ease;
+}
+
+.group-list.drag-over {
+    border: 2px dashed #007bff;
+    background-color: #f0f8ff;
+}

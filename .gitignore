@@ -1,8 +1,48 @@
-/.env
-/db_crp/migrations/0002_grouplog.py
-/db_crp/migrations/0003_userlog.py
-/db_crp/migrations/0004_alter_userlog_email.py
-/db_crp/migrations/0005_alter_userlog_email.py
-/db_crp/migrations/0001_initial.py
-/db_crp/migrations/0002_alter_settingsproject_pagination_size.py
-/db.sqlite3
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Виртуальные окружения
+venv/
+.env/
+.venv/
+ENV/
+env/
+*.env
+
+# IDE: PyCharm, IntelliJ IDEA
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# Логи
+*.log
+
+# Базы данных (по желанию)
+*.sqlite3
+*.db
+
+# Файлы дампов
+*.sql
+*.dump
+
+# Конфиги и ключи
+*.pem
+*.key
+*.crt
+
+# Тестовые артефакты
+htmlcov/
+.tox/
+.coverage
+coverage.xml
+nosetests.xml
+test_*.log
+
+# Build/packaging
+build/
+dist/
+*.egg-info/
