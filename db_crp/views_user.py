@@ -356,7 +356,8 @@ def user_edit(request, db_id, username):
             {'BYPASSRLS' if role_permissions['bypass_rls'] else 'NOBYPASSRLS'};
         """)
         conn.commit()
-        selected_groups = set(request.POST.getlist('selected_groups'))
+        # selected_groups = set(request.POST.getlist('selected_groups'))
+        selected_groups = {g.strip() for g in request.POST.getlist('selected_groups') if g.strip()}
         deleted_groups = current_groups - selected_groups
         new_groups = selected_groups - current_groups
         for groupname in deleted_groups:

@@ -4,10 +4,15 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils import timezone
-from .audit_views import group_data, create_audit_log, delete_group_messages_success, delete_group_messages_error, create_group_messages_error, \
-    create_group_messages_error_pg, create_group_messages_error_info, edit_group_messages_error_pg, edit_group_messages_error_name, \
-    edit_group_messages_success_name, edit_group_messages_error, edit_groups_privileges_tables_success, edit_groups_privileges_tables_error, \
-    user_groups_data_error, create_group_messages_group_success, edit_group_messages_error_info
+from psycopg2 import sql
+
+from .audit_views import (
+    group_data, create_audit_log, delete_group_messages_success, delete_group_messages_error,
+    create_group_messages_error, create_group_messages_error_pg, create_group_messages_error_info,
+    edit_group_messages_error_pg, edit_group_messages_error_name, edit_group_messages_success_name,
+    edit_group_messages_error, edit_groups_privileges_tables_success, edit_groups_privileges_tables_error,
+    edit_group_messages_error_info
+)
 from .forms import CreateGroupForm, GroupEditForm
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import GroupLog, ConnectingDB
@@ -15,6 +20,9 @@ from django.contrib import messages
 
 created_at = datetime(2000, 1, 1, 0, 0)
 updated_at = timezone.now()
+
+# Разрешённые привилегии для таблиц
+ALLOWED_TABLE_PRIVILEGES = {'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'}
 
 
 @login_required
@@ -31,33 +39,31 @@ def group_list(request, db_id):
     }
     user_groups_data = []
     try:
-        conn = psycopg2.connect(**temp_db_settings)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT rolname 
-            FROM pg_roles 
-            WHERE rolcanlogin = FALSE AND rolname NOT LIKE 'pg_%';  
-        """)
-        group_names = [group[0] for group in cursor.fetchall()]
-        group_user_counts = {}
-        for group in group_names:
-            cursor.execute("""
-                SELECT COUNT(*)
-                FROM pg_auth_members m
-                JOIN pg_roles r ON m.roleid = r.oid
-                WHERE r.rolname = %s;
-            """, [group])
-            count = cursor.fetchone()[0]
-            group_user_counts[group] = count
-        group_logs = {log.groupname: log for log in GroupLog.objects.filter(groupname__in=group_user_counts.keys())}
-        user_groups_data = [{
-            "groupname": group,
-            "user_count": group_user_counts[group],
-            "created_at": group_logs[group].created_at if group in group_logs else None,
-            "updated_at": group_logs[group].updated_at if group in group_logs else None,
-        } for group in group_user_counts.keys()]
-        cursor.close()
-        conn.close()
+        with psycopg2.connect(**temp_db_settings) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT rolname 
+                    FROM pg_roles 
+                    WHERE rolcanlogin = FALSE AND rolname NOT LIKE 'pg_%';  
+                """)
+                group_names = [group[0] for group in cursor.fetchall()]
+                group_user_counts = {}
+                for group in group_names:
+                    cursor.execute("""
+                        SELECT COUNT(*)
+                        FROM pg_auth_members m
+                        JOIN pg_roles r ON m.roleid = r.oid
+                        WHERE r.rolname = %s;
+                    """, [group])
+                    count = cursor.fetchone()[0]
+                    group_user_counts[group] = count
+                group_logs = {log.groupname: log for log in GroupLog.objects.filter(groupname__in=group_user_counts.keys())}
+                user_groups_data = [{
+                    "groupname": group,
+                    "user_count": group_user_counts[group],
+                    "created_at": group_logs[group].created_at if group in group_logs else None,
+                    "updated_at": group_logs[group].updated_at if group in group_logs else None,
+                } for group in group_user_counts.keys()]
     except Exception as e:
         message = f"Ошибка подключения к группам: {str(e)}"
         messages.error(request, message)
@@ -85,46 +91,33 @@ def group_create(request, db_id):
         if form.is_valid():
             group_name = form.cleaned_data['groupname']
             try:
-                conn = psycopg2.connect(**temp_db_settings)
-                cursor = conn.cursor()
-                cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s;", [group_name])
-                existing_group = cursor.fetchone()
-                if existing_group:
-                    message = create_group_messages_error(group_name)
-                    messages.error(request, message)
-                    create_audit_log(user_requester, 'create', 'group', user_requester, message)
-                    return render(request, 'groups/group_create.html', {'form': form, 'db_id': db_id})
-                if group_name.startswith('pg_'):
-                    message = create_group_messages_error_pg(group_name)
-                    messages.error(request, message)
-                    create_audit_log(user_requester, 'create', 'group', user_requester, message)
-                    return render(request, 'groups/group_create.html', {
-                        'form': form,
-                        'db_id': db_id
-                    })
-                cursor.execute(f"CREATE ROLE {group_name};")
-                conn.commit()
-                GroupLog.objects.create(groupname=group_name, created_at=created_at, updated_at=timezone.now())  # Записываем в модель
-                message = create_group_messages_group_success(group_name)
-                messages.success(request, message)
-                create_audit_log(user_requester, 'create', 'group', user_requester, message)
-                cursor.close()
-                conn.close()
+                with psycopg2.connect(**temp_db_settings) as conn:
+                    with conn.cursor() as cursor:
+                        cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s;", [group_name])
+                        if cursor.fetchone():
+                            message = create_group_messages_error(group_name)
+                            messages.error(request, message)
+                            create_audit_log(user_requester, 'create', 'group', user_requester, message)
+                            return render(request, 'groups/group_create.html', {'form': form, 'db_id': db_id})
+                        if group_name.startswith('pg_'):
+                            message = create_group_messages_error_pg(group_name)
+                            messages.error(request, message)
+                            create_audit_log(user_requester, 'create', 'group', user_requester, message)
+                            return render(request, 'groups/group_create.html', {'form': form, 'db_id': db_id})
+                        cursor.execute(sql.SQL("CREATE ROLE {}").format(sql.Identifier(group_name)))
+                        GroupLog.objects.create(groupname=group_name, created_at=created_at, updated_at=timezone.now())
+                        message = create_group_messages_group_success(group_name)
+                        messages.success(request, message)
+                        create_audit_log(user_requester, 'create', 'group', user_requester, message)
                 return redirect('group_list', db_id=db_id)
             except Exception as e:
                 message = create_group_messages_error_info(group_name)
                 messages.error(request, f"{message}: {str(e)}")
                 create_audit_log(user_requester, 'create', 'group', user_requester, f"{message}: {str(e)}")
-                return render(request, 'groups/group_create.html', {
-                    'form': form,
-                    'db_id': db_id
-                })
+                return render(request, 'groups/group_create.html', {'form': form, 'db_id': db_id})
     else:
         form = CreateGroupForm()
-    return render(request, 'groups/group_create.html', {
-        'form': form,
-        'db_id': db_id
-    })
+    return render(request, 'groups/group_create.html', {'form': form, 'db_id': db_id})
 
 
 @login_required
@@ -147,58 +140,57 @@ def group_edit(request, db_id, group_name):
         message = group_data(group_name)
         messages.success(request, message)
         create_audit_log(user_requester, 'create', 'group', user_requester, message)
+
     try:
-        conn = psycopg2.connect(**temp_db_settings)
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s;", [group_name])
-        existing_group = cursor.fetchone()
-        if not existing_group:
-            message = edit_group_messages_error_info(group_name)
-            messages.error(request, message)
-            create_audit_log(user_requester, 'update', 'group', user_requester, message)
-            return redirect('group_list', db_id=db_id)
-        if request.method == "POST":
-            form = GroupEditForm(request.POST)
-            if form.is_valid():
-                new_group_name = form.cleaned_data['groupname']
-                if new_group_name.startswith('pg_'):
-                    message = edit_group_messages_error_pg(group_name, new_group_name)
+        with psycopg2.connect(**temp_db_settings) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s;", [group_name])
+                if not cursor.fetchone():
+                    message = edit_group_messages_error_info(group_name)
                     messages.error(request, message)
                     create_audit_log(user_requester, 'update', 'group', user_requester, message)
-                    return render(request, 'groups/group_edit.html', {
-                        'form': form,
-                        'db_id': db_id,
-                        'group_name': group_name
-                    })
-                cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s;", [new_group_name])
-                existing_new_group = cursor.fetchone()
-                if existing_new_group:
-                    message = edit_group_messages_error_name(group_name, new_group_name)
-                    messages.error(request, message)
-                    create_audit_log(user_requester, 'update', 'group', user_requester, message)
-                    return render(request, 'groups/group_edit.html', {
-                        'form': form,
-                        'db_id': db_id,
-                        'group_name': group_name
-                    })
-                cursor.execute(f"ALTER ROLE {group_name} RENAME TO {new_group_name};")
-                conn.commit()
-                group_log.groupname = new_group_name
-                group_log.updated_at = timezone.now()
-                group_log.save()
-                message = edit_group_messages_success_name(group_name, new_group_name)
-                messages.success(request, message)
-                create_audit_log(user_requester, 'update', 'group', user_requester, message)
-                return redirect('group_list', db_id=db_id)
-        else:
-            form = GroupEditForm(initial={'groupname': group_log.groupname})
-        cursor.close()
-        conn.close()
+                    return redirect('group_list', db_id=db_id)
+
+                if request.method == "POST":
+                    form = GroupEditForm(request.POST)
+                    if form.is_valid():
+                        new_group_name = form.cleaned_data['groupname']
+                        if new_group_name.startswith('pg_'):
+                            message = edit_group_messages_error_pg(group_name, new_group_name)
+                            messages.error(request, message)
+                            create_audit_log(user_requester, 'update', 'group', user_requester, message)
+                            return render(request, 'groups/group_edit.html', {
+                                'form': form, 'db_id': db_id, 'group_name': group_name
+                            })
+                        cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s;", [new_group_name])
+                        if cursor.fetchone():
+                            message = edit_group_messages_error_name(group_name, new_group_name)
+                            messages.error(request, message)
+                            create_audit_log(user_requester, 'update', 'group', user_requester, message)
+                            return render(request, 'groups/group_edit.html', {
+                                'form': form, 'db_id': db_id, 'group_name': group_name
+                            })
+                        cursor.execute(
+                            sql.SQL("ALTER ROLE {} RENAME TO {}").format(
+                                sql.Identifier(group_name),
+                                sql.Identifier(new_group_name)
+                            )
+                        )
+                        group_log.groupname = new_group_name
+                        group_log.updated_at = timezone.now()
+                        group_log.save()
+                        message = edit_group_messages_success_name(group_name, new_group_name)
+                        messages.success(request, message)
+                        create_audit_log(user_requester, 'update', 'group', user_requester, message)
+                        return redirect('group_list', db_id=db_id)
+                else:
+                    form = GroupEditForm(initial={'groupname': group_log.groupname})
     except Exception as e:
         message = edit_group_messages_error(group_name)
         messages.error(request, f"{message}: {str(e)}")
         create_audit_log(user_requester, 'update', 'group', user_requester, f"{message}: {str(e)}")
         return redirect('group_list', db_id=db_id)
+
     return render(request, 'groups/group_edit.html', {
         'form': form,
         'db_id': db_id,
@@ -221,89 +213,116 @@ def groups_edit_privileges_tables(request, db_id, group_name):
     }
     tables_by_schema = {}
     granted_tables = {}
-    schemas = []
+
     try:
-        conn = psycopg2.connect(**temp_db_settings)
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT schema_name
-            FROM information_schema.schemata
-            WHERE schema_name NOT IN ('pg_catalog', 'information_schema', 'pg_toast', 'pg_temp_1', 'pg_toast_temp_1');
-        """)
-        schemas = [row[0] for row in cursor.fetchall()]
-        cursor.execute("""
-            SELECT schemaname, tablename
-            FROM pg_catalog.pg_tables
-            WHERE schemaname IN %s;
-        """, (tuple(schemas),))
-        for schema, table in cursor.fetchall():
-            if schema not in tables_by_schema:
-                tables_by_schema[schema] = {}
-            tables_by_schema[schema][table] = set()
-        cursor.execute("""
-            SELECT table_schema, table_name, privilege_type
-            FROM information_schema.role_table_grants
-            WHERE grantee = %s;
-        """, [group_name])
-        for schema, table, privilege in cursor.fetchall():
-            if schema in tables_by_schema and table in tables_by_schema[schema]:
-                tables_by_schema[schema][table].add(privilege)
-                if schema not in granted_tables:
-                    granted_tables[schema] = {}
-                if table not in granted_tables[schema]:
-                    granted_tables[schema][table] = set()
-                granted_tables[schema][table].add(privilege)
-        cursor.close()
-        conn.close()
+        with psycopg2.connect(**temp_db_settings) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT schema_name
+                    FROM information_schema.schemata
+                    WHERE schema_name NOT IN ('pg_catalog', 'information_schema', 'pg_toast', 'pg_temp_1', 'pg_toast_temp_1');
+                """)
+                schemas = [row[0] for row in cursor.fetchall()]
+
+                if schemas:
+                    cursor.execute("""
+                        SELECT schemaname, tablename
+                        FROM pg_catalog.pg_tables
+                        WHERE schemaname = ANY(%s);
+                    """, (schemas,))
+                    for schema, table in cursor.fetchall():
+                        tables_by_schema.setdefault(schema, {})[table] = set()
+
+                cursor.execute("""
+                    SELECT table_schema, table_name, privilege_type
+                    FROM information_schema.role_table_grants
+                    WHERE grantee = %s;
+                """, [group_name])
+                for schema, table, privilege in cursor.fetchall():
+                    if schema in tables_by_schema and table in tables_by_schema[schema]:
+                        tables_by_schema[schema][table].add(privilege)
+                        granted_tables.setdefault(schema, {}).setdefault(table, set()).add(privilege)
     except Exception as e:
         message = edit_group_messages_error(group_name)
         messages.error(request, f"{message}: {str(e)}")
         create_audit_log(user_requester, 'update', 'group', user_requester, f"{message}: {str(e)}")
         return redirect('groups_edit_privileges_tables', db_id=db_id, group_name=group_name)
+
     if request.method == "POST":
-        table_permissions = {}
-        for schema, tables in tables_by_schema.items():
-            for table in tables:
-                table_permissions[f"{schema}.{table}"] = request.POST.getlist(f"permissions_{schema}.{table}")
         changes_log = []
         try:
-            conn = psycopg2.connect(**temp_db_settings)
-            cursor = conn.cursor()
-            for schema, tables in tables_by_schema.items():
-                for table in tables:
-                    cursor.execute(f"REVOKE ALL ON {schema}.{table} FROM {group_name};")
-            for table, new_permissions in table_permissions.items():
-                if new_permissions:
-                    permissions_str = ", ".join(new_permissions)
-                    cursor.execute(f"GRANT {permissions_str} ON {table} TO {group_name};")
-                    schema, table_name = table.split(".")
-                    old_permissions = granted_tables.get(schema, {}).get(table_name, set())
-                    new_permissions = set(new_permissions)
-                    added_perms = new_permissions - old_permissions
-                    removed_perms = old_permissions - new_permissions
-                    if added_perms or removed_perms:
-                        changes_log.append(f"Изменены права на {schema}.{table_name}: "
-                                           f"Добавлены: {', '.join(added_perms) if added_perms else '—'} | "
-                                           f"Удалены: {', '.join(removed_perms) if removed_perms else '—'}")
-            conn.commit()
-            cursor.close()
-            conn.close()
+            with psycopg2.connect(**temp_db_settings) as conn:
+                with conn.cursor() as cursor:
+                    # Сначала отозвать всё
+                    for schema, tables in tables_by_schema.items():
+                        for table in tables:
+                            cursor.execute(
+                                sql.SQL("REVOKE ALL ON TABLE {}.{} FROM {}").format(
+                                    sql.Identifier(schema),
+                                    sql.Identifier(table),
+                                    sql.Identifier(group_name)
+                                )
+                            )
+
+                    # Теперь обработать новые права
+                    for key, raw_permissions in request.POST.items():
+                        if not key.startswith("permissions_"):
+                            continue
+                        # permissions_schema.table
+                        parts = key[len("permissions_"):].split(".", 1)
+                        if len(parts) != 2:
+                            continue
+                        schema_name, table_name = parts
+
+                        # Проверим, что такая таблица существует в списке
+                        if schema_name not in tables_by_schema or table_name not in tables_by_schema[schema_name]:
+                            continue
+
+                        # Получим все права для этой таблицы
+                        new_perms = request.POST.getlist(key)
+                        # Фильтрация по разрешённым привилегиям
+                        valid_perms = [p for p in new_perms if p in ALLOWED_TABLE_PRIVILEGES]
+                        if not valid_perms:
+                            continue
+
+                        cursor.execute(
+                            sql.SQL("GRANT {} ON TABLE {}.{} TO {}").format(
+                                sql.SQL(', ').join(sql.SQL(p) for p in valid_perms),
+                                sql.Identifier(schema_name),
+                                sql.Identifier(table_name),
+                                sql.Identifier(group_name)
+                            )
+                        )
+
+                        old_perms = granted_tables.get(schema_name, {}).get(table_name, set())
+                        new_perms_set = set(valid_perms)
+                        added = new_perms_set - old_perms
+                        removed = old_perms - new_perms_set
+                        if added or removed:
+                            changes_log.append(
+                                f"Изменены права на {schema_name}.{table_name}: "
+                                f"Добавлены: {', '.join(added) if added else '—'} | "
+                                f"Удалены: {', '.join(removed) if removed else '—'}"
+                            )
+
             if changes_log:
                 message = edit_groups_privileges_tables_success(group_name)
                 messages.success(request, message)
-                create_audit_log(user_requester, 'update', 'group', user_requester, message + "\n".join(changes_log))
+                create_audit_log(user_requester, 'update', 'group', user_requester, message + "\n" + "\n".join(changes_log))
         except Exception as e:
             message = edit_groups_privileges_tables_error(group_name)
             messages.error(request, f"{message}: {str(e)}")
             create_audit_log(user_requester, 'update', 'group', user_requester, f"{message}: {str(e)}")
             return redirect('groups_edit_privileges_tables', db_id=db_id, group_name=group_name)
+
         return redirect('group_list', db_id=db_id)
+
     tables_by_schema = dict(sorted(tables_by_schema.items()))
     return render(request, 'groups/groups_edit_privileges_tables.html', {
         'db_id': db_id,
         'group_name': group_name,
         'db_name': connection_info.name_db,
-        'schemas': schemas,
+        'schemas': sorted(tables_by_schema.keys()),
         'tables_by_schema': tables_by_schema,
     })
 
@@ -321,10 +340,9 @@ def group_delete(request, db_id, group_name):
         'port': connection_info.port_db,
     }
     try:
-        conn = psycopg2.connect(**temp_db_settings)
-        cursor = conn.cursor()
-        cursor.execute(f'DROP ROLE IF EXISTS "{group_name}";')
-        conn.commit()
+        with psycopg2.connect(**temp_db_settings) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(sql.SQL("DROP ROLE IF EXISTS {}").format(sql.Identifier(group_name)))
         group_log = GroupLog.objects.filter(groupname=group_name).first()
         if group_log:
             group_log.delete()
@@ -335,9 +353,6 @@ def group_delete(request, db_id, group_name):
         message = delete_group_messages_error(group_name)
         messages.error(request, f"{message}: {str(e)}")
         create_audit_log(user_requester, 'delete', 'group', user_requester, f"{message}: {str(e)}")
-    finally:
-        cursor.close()
-        conn.close()
     return HttpResponseRedirect(reverse('group_list', kwargs={'db_id': db_id}))
 
 
@@ -353,29 +368,28 @@ def group_info(request, db_id, group_name):
         'host': connection_info.host_db,
         'port': connection_info.port_db,
     }
+    users = []
     try:
-        conn = psycopg2.connect(**temp_db_settings)
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s;", [group_name])
-        group_exists = cursor.fetchone()
-        if not group_exists:
-            message = edit_group_messages_error_info(group_name)
-            messages.error(request, message)
-            create_audit_log(user_requester, 'info', 'group', user_requester, message)
-        cursor.execute("""
-            SELECT u.usename 
-            FROM pg_user u
-            JOIN pg_auth_members m ON u.usesysid = m.member
-            JOIN pg_roles g ON m.roleid = g.oid
-            WHERE g.rolname = %s;
-        """, [group_name])
-        users = [row[0] for row in cursor.fetchall()]
-        cursor.close()
-        conn.close()
+        with psycopg2.connect(**temp_db_settings) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s;", [group_name])
+                if not cursor.fetchone():
+                    message = edit_group_messages_error_info(group_name)
+                    messages.error(request, message)
+                    create_audit_log(user_requester, 'info', 'group', user_requester, message)
+                cursor.execute("""
+                    SELECT u.usename 
+                    FROM pg_user u
+                    JOIN pg_auth_members m ON u.usesysid = m.member
+                    JOIN pg_roles g ON m.roleid = g.oid
+                    WHERE g.rolname = %s;
+                """, [group_name])
+                users = [row[0] for row in cursor.fetchall()]
     except Exception as e:
         message = edit_group_messages_error_info(group_name)
         messages.error(request, f"{message}: {str(e)}")
         create_audit_log(user_requester, 'info', 'group', user_requester, f"{message}: {str(e)}")
+
     group_log, created = GroupLog.objects.get_or_create(
         groupname=group_name,
         defaults={'created_at': created_at, 'updated_at': timezone.now()}
@@ -384,6 +398,7 @@ def group_info(request, db_id, group_name):
         message = group_data(group_name)
         messages.success(request, message)
         create_audit_log(user_requester, 'create', 'group', user_requester, message)
+
     return render(request, 'groups/group_info.html', {
         'db_id': db_id,
         'group_name': group_name,
