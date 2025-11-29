@@ -1,11 +1,24 @@
 {% extends 'base.html' %}
 <title>{% block title %}Права доступа в {{ db_name }}{% endblock %}</title>
+
 {% block content %}
+    <style>
+        .btn-warning {
+            background-color: #f6c23e !important;
+            color: #000 !important;
+            border-color: #dda20a !important;
+        }
+        .btn-danger {
+            background-color: #e74a3b !important;
+            color: #fff !important;
+            border-color: #c0392b !important;
+        }
+    </style>
+
     <div class="welcome-container">
         <h2 class="welcome-title">Права доступа в базе данных: {{ db_name }} для группы: {{ group_name }}</h2>
         <hr>
 
-        <!-- Вывод сообщений -->
         {% if messages %}
             <div class="messages">
                 {% for message in messages %}
@@ -19,6 +32,8 @@
         <form method="post">
             {% csrf_token %}
             <div class="schema-layout">
+
+                <!-- ===== Список схем ===== -->
                 <div class="schema-list">
                     <h3>Схемы</h3>
                     <ul>
@@ -31,50 +46,94 @@
                         {% endfor %}
                     </ul>
                 </div>
+
+                <!-- ===== Содержимое схем ===== -->
                 <div class="schema-content">
                     {% for schema, tables in tables_by_schema.items %}
                         <div class="schema-container" id="schema-{{ schema }}" style="display: none;">
                             <h3 style="text-align: left">
                                 {{ schema }}
                             </h3>
+
                             <table class="permissions-table">
                                 <thead>
                                 <tr>
                                     <th style="width: 240px">Таблица</th>
+
                                     <th>
-                                        <button type="button" class="btn btn-small" onclick="toggleSchemaPermissions('{{ schema }}', 'SELECT')">Все SELECT
+                                        <button type="button"
+                                                id="btn-{{ schema }}-SELECT"
+                                                class="btn btn-small"
+                                                onclick="toggleSchemaPermissions('{{ schema }}', 'SELECT')">
+                                            Все SELECT
                                         </button>
                                     </th>
+
                                     <th>
-                                        <button type="button" class="btn btn-small" onclick="toggleSchemaPermissions('{{ schema }}', 'INSERT')">Все INSERT
+                                        <button type="button"
+                                                id="btn-{{ schema }}-INSERT"
+                                                class="btn btn-small"
+                                                onclick="toggleSchemaPermissions('{{ schema }}', 'INSERT')">
+                                            Все INSERT
                                         </button>
                                     </th>
+
                                     <th>
-                                        <button type="button" class="btn btn-small" onclick="toggleSchemaPermissions('{{ schema }}', 'UPDATE')">Все UPDATE
+                                        <button type="button"
+                                                id="btn-{{ schema }}-UPDATE"
+                                                class="btn btn-small"
+                                                onclick="toggleSchemaPermissions('{{ schema }}', 'UPDATE')">
+                                            Все UPDATE
                                         </button>
                                     </th>
+
                                     <th>
-                                        <button type="button" class="btn btn-small" onclick="toggleSchemaPermissions('{{ schema }}', 'DELETE')">Все DELETE
+                                        <button type="button"
+                                                id="btn-{{ schema }}-DELETE"
+                                                class="btn btn-small"
+                                                onclick="toggleSchemaPermissions('{{ schema }}', 'DELETE')">
+                                            Все DELETE
                                         </button>
                                     </th>
                                 </tr>
                                 </thead>
+
                                 <tbody>
                                 {% for table, permissions in tables.items %}
                                     <tr>
                                         <td>{{ table }}</td>
-                                        <td><input type="checkbox" class="permission-checkbox {{ schema }}-SELECT" name="permissions_{{ schema }}.{{ table }}"
+
+                                        <td>
+                                            <input type="checkbox"
+                                                   class="{{ schema }}-SELECT"
+                                                   name="permissions_{{ schema }}.{{ table }}"
                                                    value="SELECT"
-                                                   {% if "SELECT" in permissions %}checked{% endif %}></td>
-                                        <td><input type="checkbox" class="permission-checkbox {{ schema }}-INSERT" name="permissions_{{ schema }}.{{ table }}"
+                                                   {% if "SELECT" in permissions %}checked{% endif %}>
+                                        </td>
+
+                                        <td>
+                                            <input type="checkbox"
+                                                   class="{{ schema }}-INSERT"
+                                                   name="permissions_{{ schema }}.{{ table }}"
                                                    value="INSERT"
-                                                   {% if "INSERT" in permissions %}checked{% endif %}></td>
-                                        <td><input type="checkbox" class="permission-checkbox {{ schema }}-UPDATE" name="permissions_{{ schema }}.{{ table }}"
+                                                   {% if "INSERT" in permissions %}checked{% endif %}>
+                                        </td>
+
+                                        <td>
+                                            <input type="checkbox"
+                                                   class="{{ schema }}-UPDATE"
+                                                   name="permissions_{{ schema }}.{{ table }}"
                                                    value="UPDATE"
-                                                   {% if "UPDATE" in permissions %}checked{% endif %}></td>
-                                        <td><input type="checkbox" class="permission-checkbox {{ schema }}-DELETE" name="permissions_{{ schema }}.{{ table }}"
+                                                   {% if "UPDATE" in permissions %}checked{% endif %}>
+                                        </td>
+
+                                        <td>
+                                            <input type="checkbox"
+                                                   class="{{ schema }}-DELETE"
+                                                   name="permissions_{{ schema }}.{{ table }}"
                                                    value="DELETE"
-                                                   {% if "DELETE" in permissions %}checked{% endif %}></td>
+                                                   {% if "DELETE" in permissions %}checked{% endif %}>
+                                        </td>
                                     </tr>
                                 {% endfor %}
                                 </tbody>
@@ -85,6 +144,7 @@
                     {% endfor %}
                 </div>
             </div>
+
             <div class="all-btn">
                 <a href="{% url 'group_list' db_id=db_id %}" class="btn btn-cancel">Назад</a>
                 <button type="submit" class="btn btn-save">Сохранить</button>
@@ -93,15 +153,56 @@
     </div>
 
     <script>
+
         function showSchemaTables(schema) {
             document.querySelectorAll(".schema-container").forEach(el => el.style.display = "none");
             document.getElementById("schema-" + schema).style.display = "block";
         }
 
+        // === КНОПКИ: обычная / жёлтая / красная ===
+        function updateButtonHighlight(schema, permissionType) {
+            let checkboxes = document.querySelectorAll("." + schema + "-" + permissionType);
+            let checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+
+            let btn = document.getElementById("btn-" + schema + "-" + permissionType);
+
+            // Сброс классов
+            btn.classList.remove("btn-warning", "btn-danger");
+
+            if (checkedCount === 0) {
+                // 🔴 НЕТ НИ ОДНОЙ ГАЛОЧКИ
+                btn.classList.add("btn-danger");
+            } else if (checkedCount < checkboxes.length) {
+                // 🟡 ЕСТЬ НЕКОТОРЫЕ (partial)
+                btn.classList.add("btn-warning");
+            }
+            // Если checkedCount == length → кнопка остаётся обычной
+        }
+
+        function updateSchemaButtons(schema) {
+            ["SELECT", "INSERT", "UPDATE", "DELETE"].forEach(p => {
+                updateButtonHighlight(schema, p);
+            });
+        }
+
+        // === Тоггл кнопки ===
         function toggleSchemaPermissions(schema, permissionType) {
             let checkboxes = document.querySelectorAll("." + schema + "-" + permissionType);
             let allChecked = Array.from(checkboxes).every(checkbox => checkbox.checked);
-            checkboxes.forEach(checkbox => checkbox.checked = !allChecked);
+
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = !allChecked;
+            });
+
+            updateButtonHighlight(schema, permissionType);
         }
+
+        // Автоматическая подсветка после загрузки
+        document.addEventListener("DOMContentLoaded", function () {
+            {% for schema in tables_by_schema.keys %}
+                updateSchemaButtons("{{ schema }}");
+            {% endfor %}
+        });
     </script>
+
 {% endblock %}

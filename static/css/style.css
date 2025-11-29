@@ -475,8 +475,8 @@ main {
 }
 
 
-.priv-header-partial {
-  background-color: #fff3cd;
-  border-radius: 4px;
-  padding: 2px 4px;
+.btn-warning {
+    background-color: #f6c23e !important;
+    color: #000 !important;
+    border-color: #dda20a !important;
 }
