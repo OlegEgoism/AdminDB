@@ -11,7 +11,7 @@ from .audit_views import (
     create_group_messages_error, create_group_messages_error_pg, create_group_messages_error_info,
     edit_group_messages_error_pg, edit_group_messages_error_name, edit_group_messages_success_name,
     edit_group_messages_error, edit_groups_privileges_tables_success, edit_groups_privileges_tables_error,
-    edit_group_messages_error_info
+    edit_group_messages_error_info, create_group_messages_group_success
 )
 from .forms import CreateGroupForm, GroupEditForm
 from django.shortcuts import render, redirect, get_object_or_404

@@ -20,11 +20,11 @@
         <form method="post" enctype="multipart/form-data" class="login-form">
             {% csrf_token %}
             <div class="form-group">
-                <label for="username" class="form-label">Логин:</label>
+                <label for="username" class="form-label">* Логин:</label>
                 {{ form.username }}
             </div>
             <div class="form-group">
-                <label for="email" class="form-label">Email:</label>
+                <label for="email" class="form-label">*Email:</label>
                 {{ form.email }}
             </div>
             <div class="form-group">
@@ -36,15 +36,18 @@
                 {{ form.photo }}
             </div>
             <div class="form-group">
-                <label for="password1" class="form-label">Пароль:</label>
+                <label for="password1" class="form-label">*Пароль:</label>
                 {{ form.password1 }}
             </div>
             <div class="form-group">
-                <label for="password2" class="form-label">Проверка пароля:</label>
+                <label for="password2" class="form-label">*Проверка пароля:</label>
                 {{ form.password2 }}
             </div>
+            
+            <la class="no-groups">* Поле обезательное для заполнения</la>
+            <br>
             <button type="submit" class="btn">Зарегистрироваться</button>
         </form>
-        <h3>Уже есть аккаунт?<a href="{% url 'register' %}"> Войдите</a></h3>
+        <h3>Уже есть аккаунт?<a href="{% url 'login' %}"> Войдите</a></h3>
     </div>
 {% endblock %}

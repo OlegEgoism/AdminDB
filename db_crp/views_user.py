@@ -77,7 +77,6 @@ def user_list(request, db_id):
     })
 
 
-
 @login_required
 def user_create(request, db_id):
     """Создание пользователя"""
@@ -112,12 +111,14 @@ def user_create(request, db_id):
                     message = create_user_messages_error(username)
                     messages.error(request, message)
                     create_audit_log(user_requester, 'create', 'user', user_requester, message)
-                    return render(request, 'users/user_create.html', {'form': form})
+                    return render(request, 'users/user_create.html', {'form': form, 'db_id': db_id})
+
                 if email and UserLog.objects.filter(email=email).exists():
                     message = create_user_messages_error_email(username, email)
                     messages.error(request, message)
                     create_audit_log(user_requester, 'create', 'user', user_requester, message)
-                    return render(request, 'users/user_create.html', {'form': form})
+                    return render(request, 'users/user_create.html', {'form': form, 'db_id': db_id})
+
                 privileges = ' '.join([
                     'CREATEDB' if can_create_db else 'NOCREATEDB',
                     'SUPERUSER' if is_superuser else 'NOSUPERUSER',
@@ -174,7 +175,8 @@ def user_create(request, db_id):
                 message = create_user_error(username)
                 messages.error(request, f"{message}: {str(e)}")
                 create_audit_log(user_requester, 'error', 'user', user_requester, f"{message}: {str(e)}")
-                return render(request, 'users/user_create.html', {'form': form})
+                return render(request, 'users/user_create.html', {'form': form, 'db_id': db_id})
+
     else:
         form = UserCreateForm()
     return render(request, 'users/user_create.html', {

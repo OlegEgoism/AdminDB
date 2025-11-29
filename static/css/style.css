@@ -473,3 +473,10 @@ main {
     border: 2px dashed #007bff;
     background-color: #f0f8ff;
 }
+
+
+.priv-header-partial {
+  background-color: #fff3cd;
+  border-radius: 4px;
+  padding: 2px 4px;
+}

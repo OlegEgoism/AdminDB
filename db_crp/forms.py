@@ -7,7 +7,7 @@ from .models import CustomUser, ConnectingDB, SettingsProject
 
 class CustomUserRegistrationForm(UserCreationForm):
     """Регистрация администратора"""
-    phone_number = forms.CharField(max_length=15, required=True, help_text="Формат с кодом телефона")
+    phone_number = forms.CharField(max_length=15, help_text="Формат с кодом телефона")
     photo = forms.ImageField(required=False)
 
     class Meta:
@@ -17,6 +17,9 @@ class CustomUserRegistrationForm(UserCreationForm):
     def clean_email(self):
         """Проверка уникальности email"""
         email = self.cleaned_data.get("email")
+        if email == None or email == "":
+            raise forms.ValidationError("Почта обязательна для заполнения.")
+
         if CustomUser.objects.filter(email=email).exists():
             raise forms.ValidationError("Почта уже используется другим администратором.")
         return email
