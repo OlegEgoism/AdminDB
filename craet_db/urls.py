@@ -20,6 +20,7 @@ from django.contrib import admin
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from db_crp.views import home, register, logout_view
+from db_crp.api_views import RegisterAPIView, login_api, logout_api
 from db_crp.views_setting import settings_info, audit_log, audit_log_export, session_list, logout_user, settings_project, admin_info, admin_edit, admin_delete
 from db_crp.views_group import group_list, group_create, group_edit, group_delete, group_info, groups_edit_privileges_tables
 from db_crp.views_user import user_list, user_create, user_info, user_edit, user_delete
@@ -30,27 +31,34 @@ from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
 schema_view = get_schema_view(
-   openapi.Info(
-      title="Snippets API",
-      default_version='v1',
-      description="Test description",
-      terms_of_service="https://www.google.com/policies/terms/",
-      contact=openapi.Contact(email="contact@snippets.local"),
-      license=openapi.License(name="BSD License"),
-   ),
-   public=True,
-   permission_classes=(permissions.AllowAny,),
+    openapi.Info(
+        title="Snippets API",
+        default_version='v1',
+        description="Test description",
+        terms_of_service="https://www.google.com/policies/terms/",
+        contact=openapi.Contact(email="contact@snippets.local"),
+        license=openapi.License(name="BSD License"),
+    ),
+    public=True,
+    permission_classes=(permissions.AllowAny,),
 )
 
-urlpatterns = [
 
+swagger_urlpatterns = [
     path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
 
+    path('api/register/', RegisterAPIView.as_view(), name='api_register'),  # Swagger методы регистрации
 
+    path('api/login/', login_api, name='api-login'),
+    path('api/logout/', logout_api, name='api-logout'),
+
+
+]
+
+urlpatterns = swagger_urlpatterns + [
     path('admin/', admin.site.urls),  # Админка
-
     path('', home, name='home'),  # Главная
     path('register/', register, name='register'),  # Регистрация пользователя
     path('login/', auth_views.LoginView.as_view(), name='login'),  # Вход пользователя
