@@ -37,7 +37,7 @@ def database_list(request):
 
 @login_required
 def tables_list(request, db_id):
-    """Список таблиц в выбранной базе данных"""
+    """Список таблиц в выбранной базе данных (с отображением владельца таблиц)"""
     user_requester = request.user.username if request.user.is_authenticated else "Аноним"
     connection_info = get_object_or_404(ConnectingDB, id=db_id)
     db_settings = settings.DATABASES.get('default', {})
@@ -55,42 +55,56 @@ def tables_list(request, db_id):
         'OPTIONS': db_settings.get('OPTIONS'),
         'TIME_ZONE': db_settings.get('TIME_ZONE'),
     }
+
     tables_info = []
     db_size = "Неизвестно"
+
     try:
         temp_connection = DatabaseWrapper(temp_db_settings, alias="temp_connection")
         temp_connection.connect()
+
         with temp_connection.cursor() as cursor:
+
+            # === ВАЖНО: получаем владельца таблицы ===
             cursor.execute("""
-                       SELECT
-                           n.nspname AS schemaname,
-                           c.relname AS tablename,
-                           pg_size_pretty(pg_total_relation_size(c.oid)) AS size,
-                           (c.relpersistence = 't'
-                               OR c.relname ILIKE 'tmp_%'
-                               OR c.relname ILIKE 'temp_%'
-                               OR n.nspname LIKE 'pg_temp%') AS is_temporary
-                       FROM pg_class c
-                       JOIN pg_namespace n ON n.oid = c.relnamespace
-                       WHERE c.relkind = 'r'
-                         AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
-                       ORDER BY n.nspname, c.relname;
-                   """)
+                SELECT
+                    n.nspname AS schemaname,
+                    c.relname AS tablename,
+                    pg_size_pretty(pg_total_relation_size(c.oid)) AS size,
+                    (c.relpersistence = 't'
+                        OR c.relname ILIKE 'tmp_%'
+                        OR c.relname ILIKE 'temp_%'
+                        OR n.nspname LIKE 'pg_temp%') AS is_temporary,
+                    pg_get_userbyid(c.relowner) AS owner
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE c.relkind = 'r'
+                  AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+                ORDER BY n.nspname, c.relname;
+            """)
+
+            rows = cursor.fetchall()
+
             tables_info = [
                 {
                     "schema": row[0],
                     "name": row[1],
                     "size": row[2],
                     "is_temp": row[3],
+                    "owner": row[4],   # ← автор / владелец таблицы
                 }
-                for row in cursor.fetchall()
+                for row in rows
             ]
-            cursor.execute(f"SELECT pg_size_pretty(pg_database_size('{connection_info.name_db}'));")
+
+            cursor.execute(
+                f"SELECT pg_size_pretty(pg_database_size('{connection_info.name_db}'));"
+            )
             db_size = cursor.fetchone()[0]
+
     except OperationalError as e:
         message = f"Ошибка подключения к БД: {str(e)}"
         messages.error(request, message)
-        create_audit_log(user_requester, 'info', 'database', user_requester, f"{message}: {str(e)}")
+        create_audit_log(user_requester, 'info', 'database', user_requester, message)
         tables_info = []
         db_size = "Ошибка"
 
@@ -103,9 +117,11 @@ def tables_list(request, db_id):
         message = f"Ошибка при загрузке таблиц: {str(e)}"
         messages.error(request, message)
         tables_info = []
+
     finally:
         if 'temp_connection' in locals():
             temp_connection.close()
+
     return render(request, "databases/tables_info.html", {
         "db_name": connection_info.name_db,
         "db_size": db_size,
@@ -114,12 +130,15 @@ def tables_list(request, db_id):
     })
 
 
+
 @login_required
 def delete_temp_table(request, db_id, schema_name, table_name):
-    """Удаление временной таблицы"""
+    """Удаление временной таблицы (устойчиво к pg_temp_* особенностям)"""
+
     user_requester = request.user.username if request.user.is_authenticated else "Аноним"
+
     if request.method != "POST":
-        messages.error(request, "Неподдерживаемый метод запроса для удаления таблицы")
+        messages.error(request, "Неподдерживаемый метод запроса")
         return redirect('tables_list', db_id=db_id)
 
     connection_info = get_object_or_404(ConnectingDB, id=db_id)
@@ -135,46 +154,69 @@ def delete_temp_table(request, db_id, schema_name, table_name):
         with psycopg2.connect(**temp_db_settings) as conn:
             with conn.cursor() as cursor:
                 cursor.execute("""
-                    SELECT (c.relpersistence = 't'
-                            OR c.relname ILIKE 'tmp_%'
-                            OR c.relname ILIKE 'temp_%'
-                            OR n.nspname LIKE 'pg_temp%') AS is_temporary
+                    SELECT 
+                        c.oid,
+                        c.relname,
+                        n.nspname,
+                        c.relpersistence = 't' AS persist_temp,
+                        n.nspname LIKE 'pg_temp%%' AS schema_temp,
+                        c.relname ILIKE 'tmp_%%' AS name_tmp,
+                        c.relname ILIKE 'temp_%%' AS name_temp
                     FROM pg_class c
                     JOIN pg_namespace n ON n.oid = c.relnamespace
-                    WHERE c.relkind = 'r'
-                      AND n.nspname = %s
-                      AND c.relname = %s;
+                    WHERE n.nspname = %s
+                      AND c.relname = %s
+                      AND c.relkind IN ('r','t');
                 """, (schema_name, table_name))
-                result = cursor.fetchone()
-
-                if not result:
+                row = cursor.fetchone()
+                if row is None:
                     message = f"Таблица {schema_name}.{table_name} не найдена"
                     messages.error(request, message)
-                    create_audit_log(user_requester, 'error', 'table', f"{schema_name}.{table_name}", message)
+                    create_audit_log(user_requester, 'error', 'table',
+                                     f"{schema_name}.{table_name}", message)
                     return redirect('tables_list', db_id=db_id)
-
-                is_temporary = result[0]
-                if not is_temporary:
-                    message = "Удалять можно только временные таблицы"
+                if isinstance(row, tuple) and len(row) == 0:
+                    message = (
+                        f"PostgreSQL вернул пустые данные по таблице "
+                        f"{schema_name}.{table_name} — невозможно определить её тип"
+                    )
                     messages.error(request, message)
-                    create_audit_log(user_requester, 'error', 'table', f"{schema_name}.{table_name}", message)
+                    create_audit_log(user_requester, 'error', 'table',
+                                     f"{schema_name}.{table_name}", message)
                     return redirect('tables_list', db_id=db_id)
-
+                (_, _, _, persist_temp, schema_temp, name_tmp, name_temp) = row
+                is_temp = (
+                    persist_temp
+                    or schema_temp
+                    or name_tmp
+                    or name_temp
+                )
+                if not is_temp:
+                    message = "Можно удалять только временные таблицы"
+                    messages.error(request, message)
+                    create_audit_log(user_requester, 'error', 'table',
+                                     f"{schema_name}.{table_name}", message)
+                    return redirect('tables_list', db_id=db_id)
                 cursor.execute(
                     sql.SQL("DROP TABLE IF EXISTS {}.{};").format(
                         sql.Identifier(schema_name),
                         sql.Identifier(table_name)
                     )
                 )
-                success_message = f"Временная таблица {schema_name}.{table_name} успешно удалена"
+                success_message = (
+                    f"Временная таблица {schema_name}.{table_name} успешно удалена"
+                )
                 messages.success(request, success_message)
-                create_audit_log(user_requester, 'delete', 'table', f"{schema_name}.{table_name}", success_message)
+                create_audit_log(user_requester, 'delete', 'table',
+                                 f"{schema_name}.{table_name}", success_message)
     except Exception as e:
         message = f"Ошибка при удалении таблицы {schema_name}.{table_name}: {str(e)}"
         messages.error(request, message)
-        create_audit_log(user_requester, 'error', 'table', f"{schema_name}.{table_name}", message)
-
+        create_audit_log(user_requester, 'error', 'table',
+                         f"{schema_name}.{table_name}", message)
     return redirect('tables_list', db_id=db_id)
+
+
 
 
 

@@ -4,11 +4,12 @@
 {% block content %}
     <div class="welcome-container">
         <div class="title-with-button" style="display: flex; align-items: center; justify-content: space-between;">
-            <h2 class="welcome-title">Список таблиц в базе данных: {{ db_name }} ({{ tables_info|length }} шт.) </h2>
+            <h2 class="welcome-title">
+                Список таблиц в базе данных: {{ db_name }} ({{ tables_info|length }} шт.)
+            </h2>
         </div>
         <hr>
 
-        <!-- Вывод сообщений -->
         {% if messages %}
             <div class="messages">
                 {% for message in messages %}
@@ -19,10 +20,8 @@
             </div>
         {% endif %}
 
-        <!-- Поле поиска -->
         <input type="text" id="tableSearch" class="group-search" onkeyup="filterTables()" placeholder="Поиск таблицы..."/>
 
-        <!-- Вывод размера базы данных -->
         <div class="database-size">
             <h3>Размер базы данных: {{ db_size }}</h3>
         </div>
@@ -34,6 +33,7 @@
                 <th>Схема</th>
                 <th>Таблица</th>
                 <th>Размер</th>
+                <th>Автор</th>
                 <th>Действия</th>
             </tr>
             </thead>
@@ -44,10 +44,13 @@
                     <td>{{ table.schema }}</td>
                     <td>{{ table.name }}</td>
                     <td>{{ table.size }}</td>
+                    <td>{{ table.owner }}</td>
                     <td>
                         {% if table.is_temp %}
                             <span class="badge badge-warning">Временная</span>
-                            <form method="post" action="{% url 'delete_temp_table' db_id=db_id schema_name=table.schema table_name=table.name %}" style="display: inline;">
+                            <form method="post"
+                                  action="{% url 'delete_temp_table' db_id=db_id schema_name=table.schema table_name=table.name %}"
+                                  style="display: inline;">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-delete"
                                         onclick="return confirm('Удалить временную таблицу {{ table.schema }}.{{ table.name }}?')">
@@ -61,17 +64,15 @@
                 </tr>
             {% empty %}
                 <tr>
-                    <td colspan="5">Нет доступных таблиц</td>
+                    <td colspan="6">Нет доступных таблиц</td>
                 </tr>
             {% endfor %}
             </tbody>
         </table>
-
         <div class="all-btn">
             <a href="{% url 'database_list' %}" class="btn btn-cancel">Назад</a>
         </div>
     </div>
-
     <script>
         function filterTables() {
             let input = document.getElementById("tableSearch");
@@ -79,11 +80,7 @@
             let rows = document.querySelectorAll(".table-list tbody tr");
             rows.forEach(row => {
                 let tableName = row.querySelector("td:nth-child(3)").innerText.trim().toLowerCase();
-                if (tableName.includes(filter)) {
-                    row.style.display = "";
-                } else {
-                    row.style.display = "none";
-                }
+                row.style.display = tableName.includes(filter) ? "" : "none";
             });
         }
     </script>
