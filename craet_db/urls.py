@@ -1,19 +1,3 @@
-"""
-URL configuration for craet_db project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.1/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -25,7 +9,6 @@ from db_crp.views_setting import settings_info, audit_log, audit_log_export, ses
 from db_crp.views_group import group_list, group_create, group_edit, group_delete, group_info, groups_edit_privileges_tables
 from db_crp.views_user import user_list, user_create, user_info, user_edit, user_delete
 from db_crp.views_database import database_list, tables_list, database_connect, database_edit, database_delete, sync_users_and_groups
-
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
@@ -49,7 +32,7 @@ swagger_urlpatterns = [
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
 
-    path('api/register/', RegisterAPIView.as_view(), name='api_register'),  # Swagger методы регистрации
+    path('api/register/', RegisterAPIView.as_view(), name='api_register'),
 
     path('api/login/', login_api, name='api-login'),
     path('api/logout/', logout_api, name='api-logout'),
