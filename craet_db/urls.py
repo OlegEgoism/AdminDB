@@ -8,7 +8,7 @@ from db_crp.api_views import RegisterAPIView, login_api, logout_api
 from db_crp.views_setting import settings_info, audit_log, audit_log_export, session_list, logout_user, settings_project, admin_info, admin_edit, admin_delete
 from db_crp.views_group import group_list, group_create, group_edit, group_delete, group_info, groups_edit_privileges_tables
 from db_crp.views_user import user_list, user_create, user_info, user_edit, user_delete
-from db_crp.views_database import database_list, tables_list, database_connect, database_edit, database_delete, sync_users_and_groups
+from db_crp.views_database import database_list, tables_list, database_connect, database_edit, database_delete, sync_users_and_groups, delete_temp_table
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
@@ -74,6 +74,7 @@ urlpatterns = swagger_urlpatterns + [
 
     path('database_list/', database_list, name='database_list'),  # Список баз данных
     path('tables_list/<int:db_id>/', tables_list, name='tables_list'),  # Список таблиц в выбранной базе данных
+    path('tables_list/<int:db_id>/delete/<str:schema_name>/<str:table_name>/', delete_temp_table, name='delete_temp_table'),  # Удаление временной таблицы
     path('database_connect/', database_connect, name='database_connect'),  # Подключение к базе данных
     path('database_edit/<int:db_id>/', database_edit, name='database_edit'),  # Редактирование подключения к базе данных
     path('database_delete/<int:db_id>/', database_delete, name='database_delete'),  # Удалить подключения к базе данных

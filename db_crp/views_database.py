@@ -1,4 +1,5 @@
 import psycopg2
+from psycopg2 import sql
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
@@ -57,19 +58,33 @@ def tables_list(request, db_id):
     tables_info = []
     db_size = "Неизвестно"
     try:
-        # missing_params = [key for key, value in temp_db_settings.items() if value in [None, "", {}]]
-        # if missing_params and temp_db_settings['PASSWORD'] == None:
-        #     raise ValueError(f"Ошибка! Отсутствуют параметры подключения: {', '.join(missing_params)}")
         temp_connection = DatabaseWrapper(temp_db_settings, alias="temp_connection")
         temp_connection.connect()
         with temp_connection.cursor() as cursor:
             cursor.execute("""
-                SELECT schemaname, tablename, 
-                pg_size_pretty(pg_total_relation_size('"' || schemaname || '"."' || tablename || '"'))
-                FROM pg_catalog.pg_tables
-                WHERE schemaname NOT IN ('pg_catalog', 'information_schema');
-            """)
-            tables_info = [{"schema": row[0], "name": row[1], "size": row[2]} for row in cursor.fetchall()]
+                       SELECT
+                           n.nspname AS schemaname,
+                           c.relname AS tablename,
+                           pg_size_pretty(pg_total_relation_size(c.oid)) AS size,
+                           (c.relpersistence = 't'
+                               OR c.relname ILIKE 'tmp_%'
+                               OR c.relname ILIKE 'temp_%'
+                               OR n.nspname LIKE 'pg_temp%') AS is_temporary
+                       FROM pg_class c
+                       JOIN pg_namespace n ON n.oid = c.relnamespace
+                       WHERE c.relkind = 'r'
+                         AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
+                       ORDER BY n.nspname, c.relname;
+                   """)
+            tables_info = [
+                {
+                    "schema": row[0],
+                    "name": row[1],
+                    "size": row[2],
+                    "is_temp": row[3],
+                }
+                for row in cursor.fetchall()
+            ]
             cursor.execute(f"SELECT pg_size_pretty(pg_database_size('{connection_info.name_db}'));")
             db_size = cursor.fetchone()[0]
     except OperationalError as e:
@@ -94,8 +109,72 @@ def tables_list(request, db_id):
     return render(request, "databases/tables_info.html", {
         "db_name": connection_info.name_db,
         "db_size": db_size,
+        "db_id": db_id,
         "tables_info": tables_info,
     })
+
+
+@login_required
+def delete_temp_table(request, db_id, schema_name, table_name):
+    """Удаление временной таблицы"""
+    user_requester = request.user.username if request.user.is_authenticated else "Аноним"
+    if request.method != "POST":
+        messages.error(request, "Неподдерживаемый метод запроса для удаления таблицы")
+        return redirect('tables_list', db_id=db_id)
+
+    connection_info = get_object_or_404(ConnectingDB, id=db_id)
+    temp_db_settings = {
+        'dbname': connection_info.name_db,
+        'user': connection_info.user_db,
+        'password': connection_info.get_decrypted_password(),
+        'host': connection_info.host_db,
+        'port': connection_info.port_db,
+    }
+
+    try:
+        with psycopg2.connect(**temp_db_settings) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT (c.relpersistence = 't'
+                            OR c.relname ILIKE 'tmp_%'
+                            OR c.relname ILIKE 'temp_%'
+                            OR n.nspname LIKE 'pg_temp%') AS is_temporary
+                    FROM pg_class c
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relkind = 'r'
+                      AND n.nspname = %s
+                      AND c.relname = %s;
+                """, (schema_name, table_name))
+                result = cursor.fetchone()
+
+                if not result:
+                    message = f"Таблица {schema_name}.{table_name} не найдена"
+                    messages.error(request, message)
+                    create_audit_log(user_requester, 'error', 'table', f"{schema_name}.{table_name}", message)
+                    return redirect('tables_list', db_id=db_id)
+
+                is_temporary = result[0]
+                if not is_temporary:
+                    message = "Удалять можно только временные таблицы"
+                    messages.error(request, message)
+                    create_audit_log(user_requester, 'error', 'table', f"{schema_name}.{table_name}", message)
+                    return redirect('tables_list', db_id=db_id)
+
+                cursor.execute(
+                    sql.SQL("DROP TABLE IF EXISTS {}.{};").format(
+                        sql.Identifier(schema_name),
+                        sql.Identifier(table_name)
+                    )
+                )
+                success_message = f"Временная таблица {schema_name}.{table_name} успешно удалена"
+                messages.success(request, success_message)
+                create_audit_log(user_requester, 'delete', 'table', f"{schema_name}.{table_name}", success_message)
+    except Exception as e:
+        message = f"Ошибка при удалении таблицы {schema_name}.{table_name}: {str(e)}"
+        messages.error(request, message)
+        create_audit_log(user_requester, 'error', 'table', f"{schema_name}.{table_name}", message)
+
+    return redirect('tables_list', db_id=db_id)
 
 
 
