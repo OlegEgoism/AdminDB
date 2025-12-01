@@ -2,86 +2,143 @@
 <title>{% block title %}Таблицы в {{ db_name }}{% endblock %}</title>
 
 {% block content %}
-    <div class="welcome-container">
-        <div class="title-with-button" style="display: flex; align-items: center; justify-content: space-between;">
-            <h2 class="welcome-title">
-                Список таблиц в базе данных: {{ db_name }} ({{ tables_info|length }} шт.)
-            </h2>
-        </div>
-        <hr>
+<div class="welcome-container">
 
-        {% if messages %}
-            <div class="messages">
-                {% for message in messages %}
-                    <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-error{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
-
-        <input type="text" id="tableSearch" class="group-search" onkeyup="filterTables()" placeholder="Поиск таблицы..."/>
-
-        <div class="database-size">
-            <h3>Размер базы данных: {{ db_size }}</h3>
-        </div>
-
-        <table class="table-list">
-            <thead>
-            <tr>
-                <th>№</th>
-                <th>Схема</th>
-                <th>Таблица</th>
-                <th>Размер</th>
-                <th>Автор</th>
-                <th>Действия</th>
-            </tr>
-            </thead>
-            <tbody id="tableList">
-            {% for table in tables_info %}
-                <tr>
-                    <td><strong>{{ forloop.counter }}.</strong></td>
-                    <td>{{ table.schema }}</td>
-                    <td>{{ table.name }}</td>
-                    <td>{{ table.size }}</td>
-                    <td>{{ table.owner }}</td>
-                    <td>
-                        {% if table.is_temp %}
-                            <span class="badge badge-warning">Временная</span>
-                            <form method="post"
-                                  action="{% url 'delete_temp_table' db_id=db_id schema_name=table.schema table_name=table.name %}"
-                                  style="display: inline;">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-delete"
-                                        onclick="return confirm('Удалить временную таблицу {{ table.schema }}.{{ table.name }}?')">
-                                    Удалить
-                                </button>
-                            </form>
-                        {% else %}
-                            <span class="text-muted">—</span>
-                        {% endif %}
-                    </td>
-                </tr>
-            {% empty %}
-                <tr>
-                    <td colspan="6">Нет доступных таблиц</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        <div class="all-btn">
-            <a href="{% url 'database_list' %}" class="btn btn-cancel">Назад</a>
-        </div>
+    <div class="title-with-button" style="display: flex; align-items: center; justify-content: space-between;">
+        <h2 class="welcome-title">
+            Список таблиц в базе данных: {{ db_name }} ({{ tables_info|length }} шт.)
+        </h2>
     </div>
-    <script>
-        function filterTables() {
-            let input = document.getElementById("tableSearch");
-            let filter = input.value.toLowerCase();
-            let rows = document.querySelectorAll(".table-list tbody tr");
-            rows.forEach(row => {
-                let tableName = row.querySelector("td:nth-child(3)").innerText.trim().toLowerCase();
-                row.style.display = tableName.includes(filter) ? "" : "none";
-            });
-        }
-    </script>
+    <hr>
+
+    {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+                <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-error{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- ПОИСК -->
+    <input type="text" id="tableSearch" class="group-search" onkeyup="filterTables()" placeholder="Поиск таблицы..."/>
+
+    <!-- ФИЛЬТРЫ -->
+    <div class="filters-container">
+        <select id="schemaFilter" onchange="filterTables()" class="filter-select">
+            <option value="">Все схемы</option>
+            {% for sc in schemas %}
+                <option value="{{ sc }}">{{ sc }}</option>
+            {% endfor %}
+        </select>
+
+        <select id="ownerFilter" onchange="filterTables()" class="filter-select">
+            <option value="">Все авторы</option>
+            {% for ow in owners %}
+                <option value="{{ ow }}">{{ ow }}</option>
+            {% endfor %}
+        </select>
+
+        <select id="tempFilter" onchange="filterTables()" class="filter-select">
+            <option value="">Все таблицы</option>
+            <option value="temp">Временные</option>
+            <option value="normal">Обычные</option>
+        </select>
+    </div>
+
+    <div class="database-size">
+        <h3>Размер базы данных: {{ db_size }}</h3>
+    </div>
+
+    <table class="table-list">
+        <thead>
+        <tr>
+            <th>№</th>
+            <th>Схема</th>
+            <th>Таблица</th>
+            <th>Размер</th>
+            <th>Автор</th>
+            <th>Действия</th>
+        </tr>
+        </thead>
+
+        <tbody id="tableList">
+        {% for table in tables_info %}
+            <tr>
+                <td><strong>{{ forloop.counter }}.</strong></td>
+                <td>{{ table.schema }}</td>
+                <td>{{ table.name }}</td>
+                <td>{{ table.size }}</td>
+                <td>{{ table.owner }}</td>
+                <td>
+                    {% if table.is_temp %}
+                        <span class="badge badge-warning">Временная</span>
+                        <form method="post"
+                              action="{% url 'delete_temp_table' db_id=db_id schema_name=table.schema table_name=table.name %}"
+                              style="display: inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-delete"
+                                    onclick="return confirm('Удалить временную таблицу {{ table.schema }}.{{ table.name }}?')">
+                                Удалить
+                            </button>
+                        </form>
+                    {% else %}
+                        <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="all-btn">
+        <a href="{% url 'database_list' %}" class="btn btn-cancel">Назад</a>
+    </div>
+</div>
+
+<style>
+.filters-container {
+    display: flex;
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.filter-select {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid #aaa;
+    font-size: 14px;
+}
+</style>
+
+<script>
+function filterTables() {
+    const search = document.getElementById("tableSearch").value.toLowerCase();
+    const schema = document.getElementById("schemaFilter").value.toLowerCase();
+    const owner = document.getElementById("ownerFilter").value.toLowerCase();
+    const temp = document.getElementById("tempFilter").value;
+
+    let rows = document.querySelectorAll("#tableList tr");
+
+    rows.forEach(row => {
+        const rowSchema = row.children[1].innerText.toLowerCase();
+        const rowName = row.children[2].innerText.toLowerCase();
+        const rowOwner = row.children[4].innerText.toLowerCase();
+        const isTemp = row.children[5].innerText.includes("Временная");
+
+        let show = true;
+
+        if (search && !rowName.includes(search)) show = false;
+        if (schema && rowSchema !== schema) show = false;
+        if (owner && rowOwner !== owner) show = false;
+
+        if (temp === "temp" && !isTemp) show = false;
+        if (temp === "normal" && isTemp) show = false;
+
+        row.style.display = show ? "" : "none";
+    });
+}
+</script>
+
 {% endblock %}

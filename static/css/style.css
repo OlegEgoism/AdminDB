@@ -346,7 +346,7 @@ main {
 }
 .audit-table th, .audit-table td {
     border: 1px solid #ddd;
-    padding: 8px;
+    padding: 6px;
     text-align: left;
 }
 .audit-table th {
@@ -461,7 +461,6 @@ main {
     background: #e9ecef;
 }
 
-
 .group-list {
     min-height: 150px;
     border: 2px solid transparent;
@@ -474,9 +473,20 @@ main {
     background-color: #f0f8ff;
 }
 
-
 .btn-warning {
     background-color: #f6c23e !important;
     color: #000 !important;
     border-color: #dda20a !important;
+}
+
+.filters-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+.filter-select {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #bbb;
+    font-size: 14px;
 }

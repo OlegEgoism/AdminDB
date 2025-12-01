@@ -38,11 +38,14 @@ def database_list(request):
 @login_required
 def tables_list(request, db_id):
     """Список таблиц в выбранной базе данных (с отображением владельца таблиц)"""
+
     user_requester = request.user.username if request.user.is_authenticated else "Аноним"
     connection_info = get_object_or_404(ConnectingDB, id=db_id)
+
     db_settings = settings.DATABASES.get('default', {})
+
     temp_db_settings = {
-        'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': 'db_backends.greenplum',
         'NAME': connection_info.name_db,
         'USER': connection_info.user_db,
         'PASSWORD': connection_info.get_decrypted_password(),
@@ -65,7 +68,6 @@ def tables_list(request, db_id):
 
         with temp_connection.cursor() as cursor:
 
-            # === ВАЖНО: получаем владельца таблицы ===
             cursor.execute("""
                 SELECT
                     n.nspname AS schemaname,
@@ -91,7 +93,7 @@ def tables_list(request, db_id):
                     "name": row[1],
                     "size": row[2],
                     "is_temp": row[3],
-                    "owner": row[4],   # ← автор / владелец таблицы
+                    "owner": row[4] if row[4] else "",
                 }
                 for row in rows
             ]
@@ -100,18 +102,6 @@ def tables_list(request, db_id):
                 f"SELECT pg_size_pretty(pg_database_size('{connection_info.name_db}'));"
             )
             db_size = cursor.fetchone()[0]
-
-    except OperationalError as e:
-        message = f"Ошибка подключения к БД: {str(e)}"
-        messages.error(request, message)
-        create_audit_log(user_requester, 'info', 'database', user_requester, message)
-        tables_info = []
-        db_size = "Ошибка"
-
-    except ValueError as e:
-        messages.error(request, str(e))
-        tables_info = []
-        db_size = "Ошибка"
 
     except Exception as e:
         message = f"Ошибка при загрузке таблиц: {str(e)}"
@@ -122,12 +112,22 @@ def tables_list(request, db_id):
         if 'temp_connection' in locals():
             temp_connection.close()
 
+    # ============================
+    # УНИКАЛЬНЫЕ схемы и авторы
+    # ============================
+    schemas = sorted({t["schema"] for t in tables_info})
+    owners = sorted({t["owner"] for t in tables_info if t["owner"]})
+
     return render(request, "databases/tables_info.html", {
         "db_name": connection_info.name_db,
         "db_size": db_size,
         "db_id": db_id,
         "tables_info": tables_info,
+        "schemas": schemas,
+        "owners": owners,
     })
+
+
 
 
 
