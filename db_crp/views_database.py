@@ -26,7 +26,72 @@ def database_list(request):
     paginator = Paginator(databases, pagination_size)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    databases_info = [{"db": db} for db in page_obj]
+
+    def get_segments_info(connection_info):
+        temp_db_settings = {
+            'dbname': connection_info.name_db,
+            'user': connection_info.user_db,
+            'password': connection_info.get_decrypted_password(),
+            'host': connection_info.host_db,
+            'port': connection_info.port_db,
+        }
+
+        info = {
+            "segments": [],
+            "is_available": False,
+            "primary_count": 0,
+            "mirror_count": 0,
+            "statuses": [],
+            "modes": [],
+            "error": None,
+        }
+
+        try:
+            with psycopg2.connect(**temp_db_settings) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT EXISTS (
+                            SELECT 1 FROM pg_catalog.pg_class WHERE relname = 'gp_segment_configuration'
+                        );
+                    """)
+                    has_segments_view = cursor.fetchone()[0]
+                    if not has_segments_view:
+                        info["error"] = "Информация о сегментах недоступна"
+                        return info
+
+                    cursor.execute("""
+                        SELECT content, role, preferred_role, status, mode, hostname, address, port
+                        FROM gp_segment_configuration
+                        ORDER BY content, role;
+                    """)
+                    rows = cursor.fetchall()
+
+                    info["segments"] = [
+                        {
+                            "content": row[0],
+                            "role": row[1],
+                            "preferred_role": row[2],
+                            "status": row[3],
+                            "mode": row[4],
+                            "hostname": row[5],
+                            "address": row[6],
+                            "port": row[7],
+                        }
+                        for row in rows
+                    ]
+
+                    info["primary_count"] = sum(1 for row in rows if row[1] == 'p')
+                    info["mirror_count"] = sum(1 for row in rows if row[1] == 'm')
+                    info["statuses"] = sorted({row[3] for row in rows if row[3]})
+                    info["modes"] = sorted({row[4] for row in rows if row[4]})
+                    info["is_available"] = True
+
+        except Exception as e:
+            info["error"] = str(e)
+
+        return info
+
+    databases_info = [{"db": db, "segments": get_segments_info(db)} for db in page_obj]
     return render(request, "databases/database_list.html", {
         "databases_info": databases_info,
         "page_obj": page_obj,
