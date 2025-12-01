@@ -8,10 +8,41 @@
             color: #000 !important;
             border-color: #dda20a !important;
         }
+
         .btn-danger {
             background-color: #e74a3b !important;
             color: #fff !important;
             border-color: #c0392b !important;
+        }
+
+        /* Стили для списка схем */
+        .schema-list ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .schema-item {
+            margin-bottom: 4px;
+        }
+
+        .schema-item a {
+            display: block;
+            padding: 6px 10px;
+            border-radius: 6px;
+            text-decoration: none;
+            color: #2c3e50;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+
+        .schema-item a:hover {
+            background-color: #eef2ff;
+        }
+
+        /* Активно выбранная схема */
+        .schema-item a.active-schema {
+            background-color: #4e73df;
+            color: #fff;
+            font-weight: 600;
         }
     </style>
 
@@ -37,9 +68,11 @@
                 <div class="schema-list">
                     <h3>Схемы</h3>
                     <ul>
-                        {% for schema in tables_by_schema.keys %}
+                        {% for schema in schemas %}
                             <li class="schema-item">
-                                <a href="javascript:void(0);" onclick="showSchemaTables('{{ schema }}')">
+                                <a href="javascript:void(0);"
+                                   data-schema="{{ schema }}"
+                                   onclick="showSchemaTables('{{ schema }}')">
                                     📂 {{ schema }}
                                 </a>
                             </li>
@@ -153,10 +186,28 @@
     </div>
 
     <script>
-
         function showSchemaTables(schema) {
+            // Скрыть все контейнеры таблиц
             document.querySelectorAll(".schema-container").forEach(el => el.style.display = "none");
-            document.getElementById("schema-" + schema).style.display = "block";
+            // Показать выбранную схему
+            const container = document.getElementById("schema-" + schema);
+            if (container) {
+                container.style.display = "block";
+            }
+
+            // Снять подсветку со всех схем
+            document.querySelectorAll(".schema-item a").forEach(a => {
+                a.classList.remove("active-schema");
+            });
+
+            // Подсветить выбранную
+            const activeLink = document.querySelector('.schema-item a[data-schema="' + schema + '"]');
+            if (activeLink) {
+                activeLink.classList.add("active-schema");
+            }
+
+            // Обновить состояние кнопок для этой схемы
+            updateSchemaButtons(schema);
         }
 
         // === КНОПКИ: обычная / жёлтая / красная ===
@@ -165,6 +216,8 @@
             let checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
 
             let btn = document.getElementById("btn-" + schema + "-" + permissionType);
+
+            if (!btn) return;
 
             // Сброс классов
             btn.classList.remove("btn-warning", "btn-danger");
@@ -197,11 +250,21 @@
             updateButtonHighlight(schema, permissionType);
         }
 
-        // Автоматическая подсветка после загрузки
+        // Автоматическая инициализация: выбираем первую схему
         document.addEventListener("DOMContentLoaded", function () {
+            // Подсветка кнопок для всех схем
             {% for schema in tables_by_schema.keys %}
                 updateSchemaButtons("{{ schema }}");
             {% endfor %}
+
+            // Автоматически открыть первую схему
+            const firstSchemaLink = document.querySelector(".schema-item a");
+            if (firstSchemaLink) {
+                const schema = firstSchemaLink.getAttribute("data-schema");
+                if (schema) {
+                    showSchemaTables(schema);
+                }
+            }
         });
     </script>
 
