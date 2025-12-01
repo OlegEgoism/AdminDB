@@ -19,9 +19,9 @@ def database_list(request):
     pagination_size = SettingsProject.objects.first().pagination_size if SettingsProject.objects.exists() else 20
     search_query = request.GET.get('search', '')
     if search_query:
-        databases = ConnectingDB.objects.filter(Q(name_db__icontains=search_query)).order_by('id')
+        databases = ConnectingDB.objects.filter(Q(name_db__icontains=search_query)).order_by('name_db')
     else:
-        databases = ConnectingDB.objects.all().order_by('id')
+        databases = ConnectingDB.objects.all().order_by('name_db')
     paginator = Paginator(databases, pagination_size)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)

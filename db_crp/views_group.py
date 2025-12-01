@@ -351,9 +351,11 @@ def groups_edit_privileges_tables(request, db_id, group_name):
 
 @login_required
 def group_delete(request, db_id, group_name):
-    """Удаление группы"""
+    """Универсальное удаление роли без ошибок зависимостей"""
+
     user_requester = request.user.username if request.user.is_authenticated else "Аноним"
     connection_info = get_object_or_404(ConnectingDB, id=db_id)
+
     temp_db_settings = {
         'dbname': connection_info.name_db,
         'user': connection_info.user_db,
@@ -361,21 +363,102 @@ def group_delete(request, db_id, group_name):
         'host': connection_info.host_db,
         'port': connection_info.port_db,
     }
+
     try:
         with psycopg2.connect(**temp_db_settings) as conn:
+            conn.autocommit = True
             with conn.cursor() as cursor:
-                cursor.execute(sql.SQL("DROP ROLE IF EXISTS {}").format(sql.Identifier(group_name)))
+
+                # 1. Проверяем, что роль существует
+                cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s;", [group_name])
+                if not cursor.fetchone():
+                    messages.error(request, f"Роль {group_name} не существует")
+                    return redirect("group_list", db_id=db_id)
+
+                # 2. Удаляем членство в других группах
+                cursor.execute("""
+                    DELETE FROM pg_auth_members 
+                    WHERE member = (SELECT oid FROM pg_roles WHERE rolname = %s);
+                """, [group_name])
+
+                # 3. Получаем только пользовательские схемы
+                cursor.execute("""
+                    SELECT nspname 
+                    FROM pg_namespace 
+                    WHERE nspname NOT LIKE 'pg_%'
+                    AND nspname != 'information_schema';
+                """)
+                schemas = [row[0] for row in cursor.fetchall()]
+
+                # 4. Массовый REVOKE (таблицы, последовательности, функции)
+                for schema in schemas:
+                    # 1. REVOKE ALL privileges from tables
+                    cursor.execute(sql.SQL(
+                        "REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA {} FROM {}"
+                    ).format(sql.Identifier(schema), sql.Identifier(group_name)))
+
+                    # 2. REVOKE ALL privileges from sequences
+                    cursor.execute(sql.SQL(
+                        "REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA {} FROM {}"
+                    ).format(sql.Identifier(schema), sql.Identifier(group_name)))
+
+                    # 3. REVOKE ALL privileges from functions
+                    cursor.execute(sql.SQL(
+                        "REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA {} FROM {}"
+                    ).format(sql.Identifier(schema), sql.Identifier(group_name)))
+
+                    # 4. FIX: корректный REVOKE default privileges
+                    cursor.execute("""
+                        SELECT DISTINCT pg_get_userbyid(c.relowner)
+                        FROM pg_class c
+                        JOIN pg_namespace n ON n.oid = c.relnamespace
+                        WHERE n.nspname = %s
+                          AND c.relkind IN ('r','v','m','S','f');
+                    """, [schema])
+
+                    owners = [row[0] for row in cursor.fetchall() if row[0]]
+
+                    for owner in owners:
+                        cursor.execute(sql.SQL("""
+                            ALTER DEFAULT PRIVILEGES FOR ROLE {} IN SCHEMA {}
+                            REVOKE ALL PRIVILEGES ON TABLES FROM {};
+                        """).format(
+                            sql.Identifier(owner),
+                            sql.Identifier(schema),
+                            sql.Identifier(group_name)
+                        ))
+
+                # 5. Переназначаем владельцев объектов
+                cursor.execute("""
+                    SELECT n.nspname, c.relname
+                    FROM pg_class c
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relowner = (SELECT oid FROM pg_roles WHERE rolname = %s)
+                """, [group_name])
+
+                for schema, obj in cursor.fetchall():
+                    cursor.execute(sql.SQL(
+                        "ALTER TABLE {}.{} OWNER TO postgres"
+                    ).format(sql.Identifier(schema), sql.Identifier(obj)))
+
+                # 6. Удаляем роль
+                cursor.execute(sql.SQL("DROP ROLE {};").format(sql.Identifier(group_name)))
+
+        # Удаляем запись в Django
         group_log = GroupLog.objects.filter(groupname=group_name).first()
         if group_log:
             group_log.delete()
-            message = delete_group_messages_success(group_name)
-            messages.success(request, message)
-            create_audit_log(user_requester, 'delete', 'group', user_requester, message)
+
+        message = delete_group_messages_success(group_name)
+        messages.success(request, message)
+        create_audit_log(user_requester, "delete", "group", user_requester, message)
+
     except Exception as e:
         message = delete_group_messages_error(group_name)
         messages.error(request, f"{message}: {str(e)}")
-        create_audit_log(user_requester, 'delete', 'group', user_requester, f"{message}: {str(e)}")
-    return HttpResponseRedirect(reverse('group_list', kwargs={'db_id': db_id}))
+        create_audit_log(user_requester, "error", "group", user_requester, f"{message}: {str(e)}")
+
+    return HttpResponseRedirect(reverse("group_list", kwargs={'db_id': db_id}))
 
 
 @login_required
