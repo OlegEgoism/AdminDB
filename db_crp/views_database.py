@@ -13,6 +13,7 @@ from django.db.utils import OperationalError
 from django.core.paginator import Paginator
 from django.db.models import Q
 
+
 @login_required
 def database_list(request):
     """Список баз данных с пагинацией и поиском"""
@@ -31,8 +32,6 @@ def database_list(request):
         "page_obj": page_obj,
         "search_query": search_query
     })
-
-
 
 
 @login_required
@@ -128,9 +127,6 @@ def tables_list(request, db_id):
     })
 
 
-
-
-
 @login_required
 def delete_temp_table(request, db_id, schema_name, table_name):
     """Удаление временной таблицы (устойчиво к pg_temp_* особенностям)"""
@@ -186,10 +182,10 @@ def delete_temp_table(request, db_id, schema_name, table_name):
                     return redirect('tables_list', db_id=db_id)
                 (_, _, _, persist_temp, schema_temp, name_tmp, name_temp) = row
                 is_temp = (
-                    persist_temp
-                    or schema_temp
-                    or name_tmp
-                    or name_temp
+                        persist_temp
+                        or schema_temp
+                        or name_tmp
+                        or name_temp
                 )
                 if not is_temp:
                     message = "Можно удалять только временные таблицы"
@@ -215,9 +211,6 @@ def delete_temp_table(request, db_id, schema_name, table_name):
         create_audit_log(user_requester, 'error', 'table',
                          f"{schema_name}.{table_name}", message)
     return redirect('tables_list', db_id=db_id)
-
-
-
 
 
 def database_connect(request):
@@ -353,4 +346,3 @@ def sync_users_and_groups(request, db_id):
         if conn is not None:
             conn.close()
     return redirect("database_list")
-
