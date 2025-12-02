@@ -171,6 +171,13 @@ def edit_group_messages_success_name(group_name, new_group_name):  # +
     return f"Группа '{group_name}' успешно переименована в '{new_group_name}'."
 
 
+def edit_group_messages_success_pinfo(groupinfo, new_group_info):  # +
+    if groupinfo == None:
+        return f"Добавлено описание группы '{new_group_info}'."
+    else:
+        return f"Описание группы '{groupinfo}' успешно обновлено на '{new_group_info}'."
+
+
 def edit_group_messages_error(group_name):  # +
     return f"Ошибка при редактировании группы '{group_name}'."
 
@@ -185,24 +192,24 @@ def edit_groups_privileges_tables_error(group_name):  # +
 
 # ---------------------------------------------------------------------------------------------------------------
 # ПОДКЛЮЧЕНИЕ К БАЗЕ ДАННЫХ
-def connect_data_base_success(name_db, user_db, port_db, host_db):  # +
-    return f"Подключение к базе данных '{name_db}' успешно сохранено. Пользователь: '{user_db}'. Пароль: ****. Порт: '{port_db}'. Хост: '{host_db}'."
+def connect_data_base_success(name_db, user_db, port_db, host_db, info_db):  # +
+    return f"Подключение к базе данных '{name_db}' успешно сохранено. Пользователь: '{user_db}'. Пароль: ****. Порт: '{port_db}'. Хост: '{host_db}'. Название подключения: '{info_db}'."
 
 
 # ---------------------------------------------------------------------------------------------------------------
 # РЕДАКТИРОВАНИЕ ПОДКЛЮЧЕНИЯ К БАЗЕ ДАННЫХ
-def update_data_base_success(name_db, user_db, port_db, host_db):  # +
-    return f"Подключение к базе данных '{name_db}' успешно обновлено. Пользователь: '{user_db}'. Пароль: ****. Порт: '{port_db}'. Хост: '{host_db}'."
+def update_data_base_success(name_db, user_db, port_db, host_db, info_db):  # +
+    return f"Подключение к базе данных '{name_db}' успешно обновлено. Пользователь: '{user_db}'. Пароль: ****. Порт: '{port_db}'. Хост: '{host_db}'. Название подключения: '{info_db}'."
 
 
 # ---------------------------------------------------------------------------------------------------------------
 # УДАЛЕНИЕ ПОДКЛЮЧЕНИЯ К БАЗЕ ДАННЫХ
-def delete_data_base_success(name_db, user_db, port_db, host_db):  # +
-    return f"Подключение к базе данных '{name_db}' успешно удалено. Пользователь: '{user_db}'. Пароль: ****. Порт: '{port_db}'. Хост: '{host_db}'."
+def delete_data_base_success(name_db, user_db, port_db, host_db, info_db):  # +
+    return f"Подключение к базе данных '{name_db}' успешно удалено. Пользователь: '{user_db}'. Пароль: ****. Порт: '{port_db}'. Хост: '{host_db}'. Название подключения: '{info_db}'."
 
 
-def delete_data_base_error(name_db, user_db, port_db, host_db):  # +
-    return f"Ошибка при удалении подключения к базе данных '{name_db}'. Пользователь: '{user_db}'. Пароль: ****. Порт: '{port_db}'. Хост: '{host_db}'."
+def delete_data_base_error(name_db, user_db, port_db, host_db, info_db):  # +
+    return f"Ошибка при удалении подключения к базе данных '{name_db}'. Пользователь: '{user_db}'. Пароль: ****. Порт: '{port_db}'. Хост: '{host_db}'. Название подключения: '{info_db}'."
 
 
 # ---------------------------------------------------------------------------------------------------------------

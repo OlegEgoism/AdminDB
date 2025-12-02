@@ -32,16 +32,17 @@
                     <div class="group-number">
                         <strong>{{ forloop.counter }}.</strong>
                     </div>
+                    <div class="group-dates">
+                        <a href="{% url 'tables_list' item.db.id %}" class="group-link-user">{{ item.db.info_db }}</a>
+                    </div>
                     <div class="group-name">
-                        <a href="{% url 'tables_list' item.db.id %}" class="group-link-user">{{ item.db.name_db }}</a>
+                        <p style="font-size: 16px"><strong>{{ item.db.name_db }}</strong></p>
                     </div>
                     <div class="group-dates">
-                        <small>Создан: {% if item.db.created_at %}{{ item.db.created_at|date:"d.m.Y H:i" }}{% else %}
-                            —{% endif %}</small>
-                        <small>Изменен: {% if item.db.updated_at %}{{ item.db.updated_at|date:"d.m.Y H:i" }}{% else %}
-                            —{% endif %}</small>
+                        <small>Создан: {% if item.db.created_at %}{{ item.db.created_at|date:"d.m.Y H:i" }}{% else %} — {% endif %}</small>
+                        <small>Изменен: {% if item.db.updated_at %}{{ item.db.updated_at|date:"d.m.Y H:i" }}{% else %} — {% endif %}</small>
                     </div>
-                   <div class="group-dates">
+                    <div class="group-dates">
                         <small>Хост: {{ item.db.host_db }}</small>
                         <small>Порт: {{ item.db.port_db }}</small>
                     </div>
@@ -49,42 +50,8 @@
                         <small>Сегменты:</small>
                         {% if item.segments.is_available %}
                             <small>Первичные: {{ item.segments.primary_count }}, зеркальные: {{ item.segments.mirror_count }}</small>
-                            <small>Статусы: {{ item.segments.statuses|join:', ' }}{% if item.segments.modes %} (режимы: {{ item.segments.modes|join:', ' }}){% endif %}</small>
-                            {% if item.segments.segments %}
-                                <details>
-                                    <summary>Детали сегментов</summary>
-                                    <table class="group-table">
-                                        <thead>
-                                        <tr>
-                                            <th>#</th>
-                                            <th>Роль</th>
-                                            <th>Предпочитаемая</th>
-                                            <th>Статус</th>
-                                            <th>Режим</th>
-                                            <th>Хост</th>
-                                            <th>Адрес</th>
-                                            <th>Порт</th>
-                                        </tr>
-                                        </thead>
-                                        <tbody>
-                                        {% for segment in item.segments.segments %}
-                                            <tr>
-                                                <td>{{ segment.content }}</td>
-                                                <td>{{ segment.role }}</td>
-                                                <td>{{ segment.preferred_role }}</td>
-                                                <td>{{ segment.status }}</td>
-                                                <td>{{ segment.mode }}</td>
-                                                <td>{{ segment.hostname }}</td>
-                                                <td>{{ segment.address }}</td>
-                                                <td>{{ segment.port }}</td>
-                                            </tr>
-                                        {% endfor %}
-                                        </tbody>
-                                    </table>
-                                </details>
-                            {% endif %}
                         {% elif item.segments.error %}
-                            <small>Ошибка: {{ item.segments.error }}</small>
+                            <small>{{ item.segments.error }}</small>
                         {% else %}
                             <small>Нет данных</small>
                         {% endif %}
@@ -98,7 +65,7 @@
                            onclick="return confirm('Удалить подключение {{ item.db.name_db }}?')">Удалить</a>
                     </div>
                 </div>
-            {% empty %}
+                {% empty %}
                 <li>Нет доступных баз данных</li>
             {% endfor %}
         </div>
@@ -119,15 +86,15 @@
         </div>
     </div>
 
-{#    <script>#}
-{#        let timeout = null;#}
-{##}
-{#        // Функция для дебаунсинга#}
-{#        function debounceSearch() {#}
-{#            clearTimeout(timeout);#}
-{#            timeout = setTimeout(function() {#}
-{#                document.getElementById('searchForm').submit();#}
-{#            }, 1000); // задержка 500 миллисекунд#}
-{#        }#}
-{#    </script>#}
+    {#    <script>#}
+    {#        let timeout = null;#}
+    {##}
+    {#        // Функция для дебаунсинга#}
+    {#        function debounceSearch() {#}
+    {#            clearTimeout(timeout);#}
+    {#            timeout = setTimeout(function() {#}
+    {#                document.getElementById('searchForm').submit();#}
+    {#            }, 1000); // задержка 500 миллисекунд#}
+    {#        }#}
+    {#    </script>#}
 {% endblock %}

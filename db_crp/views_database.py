@@ -56,7 +56,7 @@ def database_list(request):
                     """)
                     has_segments_view = cursor.fetchone()[0]
                     if not has_segments_view:
-                        info["error"] = "Информация о сегментах недоступна"
+                        info["error"] = " Нет итнформации о сегментах"
                         return info
 
                     cursor.execute("""
@@ -289,7 +289,8 @@ def database_connect(request):
             user_db = form.cleaned_data['user_db']
             port_db = form.cleaned_data['port_db']
             host_db = form.cleaned_data['host_db']
-            message = connect_data_base_success(name_db, user_db, port_db, host_db)
+            info_db = form.cleaned_data['info_db']
+            message = connect_data_base_success(name_db, user_db, port_db, host_db, info_db)
             messages.success(request, message)
             create_audit_log(user_requester, 'create', 'database', name_db, message)
             return redirect('database_list')
@@ -311,7 +312,8 @@ def database_edit(request, db_id):
             user_db = form.cleaned_data['user_db']
             port_db = form.cleaned_data['port_db']
             host_db = form.cleaned_data['host_db']
-            message = update_data_base_success(name_db, user_db, port_db, host_db)
+            info_db = form.cleaned_data['info_db']
+            message = update_data_base_success(name_db, user_db, port_db, host_db, info_db)
             messages.success(request, message)
             create_audit_log(user_requester, 'update', 'database', name_db, message)
             return redirect('database_list')
@@ -332,13 +334,14 @@ def database_delete(request, db_id):
     user_db = database.user_db
     port_db = database.port_db
     host_db = database.host_db
+    info_db = database.info_db
     try:
         database.delete()
-        message = delete_data_base_success(name_db, user_db, port_db, host_db)
+        message = delete_data_base_success(name_db, user_db, port_db, host_db, info_db)
         messages.success(request, message)
         create_audit_log(user_requester, 'delete', 'database', name_db, message)
     except Exception as e:
-        message = delete_data_base_error(name_db, user_db, port_db, host_db)
+        message = delete_data_base_error(name_db, user_db, port_db, host_db, info_db)
         messages.success(request, f"{message}: {str(e)}")
         create_audit_log(user_requester, 'delete', 'database', name_db, f"{message}: {str(e)}")
     return redirect('database_list')

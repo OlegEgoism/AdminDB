@@ -54,11 +54,13 @@ class UserEditForm(forms.Form):
 
 class GroupEditForm(forms.Form):
     """Редактирование группы"""
+    groupinfo = forms.CharField(label="Описание группы", max_length=200)
     groupname = forms.CharField(label="Название", max_length=150)
 
 
 class CreateGroupForm(forms.Form):
     """Создание группы"""
+    groupinfo = forms.CharField(label="Описание группы", max_length=200)
     groupname = forms.CharField(label="Название", max_length=150)
 
 
@@ -67,8 +69,9 @@ class DatabaseConnectForm(forms.ModelForm):
 
     class Meta:
         model = ConnectingDB
-        fields = ["name_db", "user_db", "password_db", "host_db", "port_db"]
+        fields = ["info_db", "name_db", "user_db", "password_db", "host_db", "port_db"]
         labels = {
+            "info_db": "Название подключения",
             "name_db": "Название базы данных",
             "user_db": "Пользователь",
             "password_db": "Пароль",

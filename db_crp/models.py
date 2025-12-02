@@ -30,6 +30,7 @@ class CustomUser(AbstractUser):
 
 class GroupLog(DT):
     """Группы в базе данных"""
+    groupinfo = models.CharField(verbose_name="Описание группы", max_length=200, blank=True, null=True)
     groupname = models.CharField(verbose_name="Имя группы", max_length=100, unique=True)
 
     def __str__(self):
@@ -95,6 +96,7 @@ class Audit(models.Model):
 
 class ConnectingDB(DT):
     """Подключение к базе данных"""
+    info_db = models.CharField(verbose_name="Название подключения", max_length=100, unique=True)
     name_db = models.CharField(verbose_name="Название базы данных", max_length=150, unique=True)
     user_db = models.CharField(verbose_name="Пользователь", max_length=150)
     password_db = models.CharField(verbose_name="Пароль", max_length=150)

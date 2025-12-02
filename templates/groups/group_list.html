@@ -35,6 +35,18 @@
                             {{ group.groupname }}
                         </a>
                     </div>
+
+                    <div class="group-dates">
+                        <p style="font-size: 16px">
+                            Описание:
+                            {% if group.groupinfo %}
+                                {{ group.groupinfo }}
+                            {% else %}
+                                <span>Описание отсутствует</span>
+                            {% endif %}
+                        </p>
+                    </div>
+
                     <div class="group-dates">
                         <small>Создан: {% if group.created_at %}{{ group.created_at|date:"d.m.Y H:i" }}{% else %}
                             —{% endif %}</small>
@@ -55,7 +67,7 @@
                         </a>
                     </div>
                 </div>
-            {% empty %}
+                {% empty %}
                 <li>Нет пользовательских групп</li>
             {% endfor %}
         </div>

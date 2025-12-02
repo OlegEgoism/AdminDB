@@ -11,7 +11,7 @@ from .audit_views import (
     create_group_messages_error, create_group_messages_error_pg, create_group_messages_error_info,
     edit_group_messages_error_pg, edit_group_messages_error_name, edit_group_messages_success_name,
     edit_group_messages_error, edit_groups_privileges_tables_success, edit_groups_privileges_tables_error,
-    edit_group_messages_error_info, create_group_messages_group_success
+    edit_group_messages_error_info, create_group_messages_group_success, edit_group_messages_success_pinfo
 )
 from .forms import CreateGroupForm, GroupEditForm
 from django.shortcuts import render, redirect, get_object_or_404
@@ -60,6 +60,7 @@ def group_list(request, db_id):
                 group_logs = {log.groupname: log for log in GroupLog.objects.filter(groupname__in=group_user_counts.keys())}
                 user_groups_data = [{
                     "groupname": group,
+                    "groupinfo": group_logs[group].groupinfo if group in group_logs else "",
                     "user_count": group_user_counts[group],
                     "created_at": group_logs[group].created_at if group in group_logs else None,
                     "updated_at": group_logs[group].updated_at if group in group_logs else None,
@@ -79,6 +80,7 @@ def group_create(request, db_id):
     """Создание группы"""
     user_requester = request.user.username if request.user.is_authenticated else "Аноним"
     connection_info = get_object_or_404(ConnectingDB, id=db_id)
+
     temp_db_settings = {
         'dbname': connection_info.name_db,
         'user': connection_info.user_db,
@@ -86,10 +88,13 @@ def group_create(request, db_id):
         'host': connection_info.host_db,
         'port': connection_info.port_db,
     }
+
     if request.method == "POST":
         form = CreateGroupForm(request.POST)
         if form.is_valid():
             group_name = form.cleaned_data['groupname']
+            group_info = form.cleaned_data['groupinfo']  # ← ВАЖНО
+
             try:
                 with psycopg2.connect(**temp_db_settings) as conn:
                     with conn.cursor() as cursor:
@@ -99,24 +104,39 @@ def group_create(request, db_id):
                             messages.error(request, message)
                             create_audit_log(user_requester, 'create', 'group', user_requester, message)
                             return render(request, 'groups/group_create.html', {'form': form, 'db_id': db_id})
+
                         if group_name.startswith('pg_'):
                             message = create_group_messages_error_pg(group_name)
                             messages.error(request, message)
                             create_audit_log(user_requester, 'create', 'group', user_requester, message)
                             return render(request, 'groups/group_create.html', {'form': form, 'db_id': db_id})
+
+                        # Создаём роль в Postgres
                         cursor.execute(sql.SQL("CREATE ROLE {}").format(sql.Identifier(group_name)))
-                        GroupLog.objects.create(groupname=group_name, created_at=created_at, updated_at=timezone.now())
+
+                        # Сохраняем описание в Django модели
+                        GroupLog.objects.create(
+                            groupname=group_name,
+                            groupinfo=group_info,  # ← ДОБАВЛЕНО
+                            created_at=created_at,
+                            updated_at=timezone.now()
+                        )
+
                         message = create_group_messages_group_success(group_name)
                         messages.success(request, message)
                         create_audit_log(user_requester, 'create', 'group', user_requester, message)
+
                 return redirect('group_list', db_id=db_id)
+
             except Exception as e:
                 message = create_group_messages_error_info(group_name)
                 messages.error(request, f"{message}: {str(e)}")
                 create_audit_log(user_requester, 'create', 'group', user_requester, f"{message}: {str(e)}")
                 return render(request, 'groups/group_create.html', {'form': form, 'db_id': db_id})
+
     else:
         form = CreateGroupForm()
+
     return render(request, 'groups/group_create.html', {'form': form, 'db_id': db_id})
 
 
@@ -125,6 +145,7 @@ def group_edit(request, db_id, group_name):
     """Редактирование группы"""
     user_requester = request.user.username if request.user.is_authenticated else "Аноним"
     connection_info = get_object_or_404(ConnectingDB, id=db_id)
+
     temp_db_settings = {
         'dbname': connection_info.name_db,
         'user': connection_info.user_db,
@@ -132,10 +153,12 @@ def group_edit(request, db_id, group_name):
         'host': connection_info.host_db,
         'port': connection_info.port_db,
     }
+
     group_log, created = GroupLog.objects.get_or_create(
         groupname=group_name,
         defaults={'created_at': created_at, 'updated_at': timezone.now()}
     )
+
     if created:
         message = group_data(group_name)
         messages.success(request, message)
@@ -144,6 +167,8 @@ def group_edit(request, db_id, group_name):
     try:
         with psycopg2.connect(**temp_db_settings) as conn:
             with conn.cursor() as cursor:
+
+                # Проверяем, что роль существует в БД
                 cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s;", [group_name])
                 if not cursor.fetchone():
                     message = edit_group_messages_error_info(group_name)
@@ -151,10 +176,34 @@ def group_edit(request, db_id, group_name):
                     create_audit_log(user_requester, 'update', 'group', user_requester, message)
                     return redirect('group_list', db_id=db_id)
 
+                # ====================== POST ======================
                 if request.method == "POST":
                     form = GroupEditForm(request.POST)
+
                     if form.is_valid():
                         new_group_name = form.cleaned_data['groupname']
+                        new_group_info = form.cleaned_data['groupinfo']
+
+                        # Сохраняем старое описание
+                        old_group_info = group_log.groupinfo
+
+                        # === 1. Если имя НЕ меняется — обновляем только описание ===
+                        if new_group_name == group_name:
+                            group_log.groupinfo = new_group_info
+                            group_log.updated_at = timezone.now()
+                            group_log.save()
+
+                            # ⬇️ Используем старое и новое описание
+                            message = edit_group_messages_success_pinfo(old_group_info, new_group_info)
+                            messages.success(request, message)
+
+                            create_audit_log(
+                                user_requester, 'update', 'group', user_requester, message
+                            )
+
+                            return redirect('group_list', db_id=db_id)
+
+                        # === 2. защита от pg_ ===
                         if new_group_name.startswith('pg_'):
                             message = edit_group_messages_error_pg(group_name, new_group_name)
                             messages.error(request, message)
@@ -162,6 +211,8 @@ def group_edit(request, db_id, group_name):
                             return render(request, 'groups/group_edit.html', {
                                 'form': form, 'db_id': db_id, 'group_name': group_name
                             })
+
+                        # === 3. Проверка существующей роли ===
                         cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s;", [new_group_name])
                         if cursor.fetchone():
                             message = edit_group_messages_error_name(group_name, new_group_name)
@@ -170,21 +221,35 @@ def group_edit(request, db_id, group_name):
                             return render(request, 'groups/group_edit.html', {
                                 'form': form, 'db_id': db_id, 'group_name': group_name
                             })
+
+                        # === 4. Переименование роли в PostgreSQL ===
                         cursor.execute(
                             sql.SQL("ALTER ROLE {} RENAME TO {}").format(
                                 sql.Identifier(group_name),
                                 sql.Identifier(new_group_name)
                             )
                         )
+
+                        # === 5. Сохраняем данные в Django ===
                         group_log.groupname = new_group_name
+                        group_log.groupinfo = new_group_info
                         group_log.updated_at = timezone.now()
                         group_log.save()
+
                         message = edit_group_messages_success_name(group_name, new_group_name)
                         messages.success(request, message)
+
                         create_audit_log(user_requester, 'update', 'group', user_requester, message)
+
                         return redirect('group_list', db_id=db_id)
+
+                # ====================== GET ======================
                 else:
-                    form = GroupEditForm(initial={'groupname': group_log.groupname})
+                    form = GroupEditForm(initial={
+                        'groupname': group_log.groupname,
+                        'groupinfo': group_log.groupinfo,
+                    })
+
     except Exception as e:
         message = edit_group_messages_error(group_name)
         messages.error(request, f"{message}: {str(e)}")
@@ -197,6 +262,7 @@ def group_edit(request, db_id, group_name):
         'group_name': group_name,
         'group_log': group_log
     })
+
 
 
 @login_required
