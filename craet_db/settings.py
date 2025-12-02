@@ -147,8 +147,8 @@ EMAIL_BACKEND = os.getenv('EMAIL_BACKEND')
 
 DATABASES = {
     'default': {
-        # 'ENGINE': 'django.db.backends.postgresql',
-        'ENGINE': 'db_backends.greenplum',
+        'ENGINE': 'django.db.backends.postgresql',
+        # 'ENGINE': 'db_backends.greenplum',
         'NAME': os.getenv('POSTGRES_DB'),
         'USER': os.getenv('POSTGRES_USER'),
         'PASSWORD': os.getenv('POSTGRES_PASSWORD'),

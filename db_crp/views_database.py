@@ -5,11 +5,14 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
 from django.db.backends.postgresql.base import DatabaseWrapper
 from django.conf import settings
+
+from db_backends.greenplum.base import DatabaseWrapper
+
+
 from .audit_views import connect_data_base_success, create_audit_log, delete_data_base_success, delete_data_base_error, update_data_base_success, \
     sync_data_base_success, sync_data_base_error
 from .forms import DatabaseConnectForm
 from .models import ConnectingDB, UserLog, GroupLog, SettingsProject
-from django.db.utils import OperationalError
 from django.core.paginator import Paginator
 from django.db.models import Q
 
