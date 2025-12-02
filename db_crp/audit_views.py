@@ -2,7 +2,7 @@ from django.utils.timezone import now
 from db_crp.models import Audit
 
 
-def create_audit_log(user_requester, action_type, entity_type, entity_name, details):
+def create_audit_log(user_requester, action_type, entity_type, entity_name, details, database_name=None):
     """Функция для создания записи аудита"""
     Audit.objects.create(
         username=user_requester,
@@ -10,7 +10,8 @@ def create_audit_log(user_requester, action_type, entity_type, entity_name, deta
         entity_type=entity_type,
         entity_name=entity_name,
         timestamp=now(),
-        details=details
+        details=details,
+        database_name=database_name
     )
 
 

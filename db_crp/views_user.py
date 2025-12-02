@@ -68,7 +68,7 @@ def user_list(request, db_id):
     except Exception as e:
         message = user_error()
         messages.error(request, f"{message}: {str(e)}")
-        create_audit_log(user_requester, 'info', 'create', user_requester, f"{message}: {str(e)}")
+        create_audit_log(user_requester, 'info', 'create', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
         page_obj = []  # Добавлено дефолтное значение для page_obj
     return render(request, 'users/user_list.html', {
         'users_data': page_obj.object_list if isinstance(page_obj, Paginator) else page_obj,
@@ -110,13 +110,13 @@ def user_create(request, db_id):
                 if cursor.fetchone():
                     message = create_user_messages_error(username)
                     messages.error(request, message)
-                    create_audit_log(user_requester, 'create', 'user', user_requester, message)
+                    create_audit_log(user_requester, 'create', 'user', user_requester, message, database_name=connection_info.name_db)
                     return render(request, 'users/user_create.html', {'form': form, 'db_id': db_id})
 
                 if email and UserLog.objects.filter(email=email).exists():
                     message = create_user_messages_error_email(username, email)
                     messages.error(request, message)
-                    create_audit_log(user_requester, 'create', 'user', user_requester, message)
+                    create_audit_log(user_requester, 'create', 'user', user_requester, message, database_name=connection_info.name_db)
                     return render(request, 'users/user_create.html', {'form': form, 'db_id': db_id})
 
                 privileges = ' '.join([
@@ -143,7 +143,7 @@ def user_create(request, db_id):
                 )
                 message = create_user_messages_success(username)
                 messages.success(request, message)
-                create_audit_log(user_requester, 'create', 'user', user_requester, message)
+                create_audit_log(user_requester, 'create', 'user', user_requester, message, database_name=connection_info.name_db)
                 if email and send_email:
                     try:
                         subject = "Ваш аккаунт создан"
@@ -163,18 +163,18 @@ def user_create(request, db_id):
                         email_message.send()
                         message = create_user_messages_email(username, email, can_create_db, is_superuser, inherit, create_role, login, replication, bypass_rls)
                         messages.success(request, message)
-                        create_audit_log(user_requester, 'create', 'user', user_requester, message)
+                        create_audit_log(user_requester, 'create', 'user', user_requester, message, database_name=connection_info.name_db)
                     except Exception as email_error:
                         message = create_user_messages_email_error(username)
                         messages.error(request, f"{message}: {str(email_error)}")
-                        create_audit_log(user_requester, 'create', 'user', user_requester, f"{message}: {str(email_error)}")
+                        create_audit_log(user_requester, 'create', 'user', user_requester, f"{message}: {str(email_error)}", database_name=connection_info.name_db)
                 cursor.close()
                 conn.close()
                 return redirect('user_list', db_id=db_id)
             except Exception as e:
                 message = create_user_error(username)
                 messages.error(request, f"{message}: {str(e)}")
-                create_audit_log(user_requester, 'error', 'user', user_requester, f"{message}: {str(e)}")
+                create_audit_log(user_requester, 'error', 'user', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
                 return render(request, 'users/user_create.html', {'form': form, 'db_id': db_id})
 
     else:
@@ -203,7 +203,7 @@ def user_info(request, db_id, username):
     except Exception as e:
         message = user_info_all_error()
         messages.error(request, f"{message}: {str(e)}")
-        create_audit_log(user_requester, 'info', 'user', user_requester, f"{message}: {str(e)}")
+        create_audit_log(user_requester, 'info', 'user', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
         return redirect('user_list', db_id=db_id)
     cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s;", [username])
     user_exists = cursor.fetchone()
@@ -212,7 +212,7 @@ def user_info(request, db_id, username):
         conn.close()
         message = user_info_error(username)
         messages.success(request, message)
-        create_audit_log(user_requester, 'info', 'user', user_requester, message)
+        create_audit_log(user_requester, 'info', 'user', user_requester, message, database_name=connection_info.name_db)
         return redirect('user_list', db_id=db_id)
     cursor.execute("""
         SELECT 
@@ -262,7 +262,7 @@ def user_info(request, db_id, username):
         user_data = None
         message = user_info_error(username)
         messages.success(request, message)
-        create_audit_log(user_requester, 'info', 'user', user_requester, message)
+        create_audit_log(user_requester, 'info', 'user', user_requester, message, database_name=connection_info.name_db)
     cursor.close()
     conn.close()
     return render(request, 'users/user_info.html', {
@@ -289,14 +289,14 @@ def user_edit(request, db_id, username):
     except Exception as e:
         message = user_info_all_error()
         messages.error(request, f"{message}: {str(e)}")
-        create_audit_log(user_requester, 'update', 'user', user_requester, f"{message}: {str(e)}")
+        create_audit_log(user_requester, 'update', 'user', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
         return redirect('user_list', db_id=db_id)
     cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s;", [username])
     user_exists = cursor.fetchone()
     if not user_exists:
         message = edit_user_messages_db_error(username)
         messages.success(request, message)
-        create_audit_log(user_requester, 'update', 'user', user_requester, message)
+        create_audit_log(user_requester, 'update', 'user', user_requester, message, database_name=connection_info.name_db)
     user_log = UserLog.objects.filter(username=username).first()
     user_email = user_log.email if user_log else ""
     cursor.execute("""
@@ -367,19 +367,19 @@ def user_edit(request, db_id, username):
                 cursor.execute(f"REVOKE {groupname} FROM {username};")
                 message = edit_user_messages_delete_group_success(username, groupname)
                 messages.success(request, message)
-                create_audit_log(user_requester, 'delete', 'user', user_requester, message)
+                create_audit_log(user_requester, 'delete', 'user', user_requester, message, database_name=connection_info.name_db)
         for groupname in new_groups:
             if groupname.strip():
                 cursor.execute(f"GRANT {groupname} TO {username};")
                 message = edit_user_messages_add_group_success(username, groupname)
                 messages.success(request, message)
-                create_audit_log(user_requester, 'create', 'user', user_requester, message)
+                create_audit_log(user_requester, 'create', 'user', user_requester, message, database_name=connection_info.name_db)
         conn.commit()
         cursor.close()
         conn.close()
         message = edit_user_messages_success(username)
         messages.success(request, message)
-        create_audit_log(user_requester, 'update', 'user', user_requester, message)
+        create_audit_log(user_requester, 'update', 'user', user_requester, message, database_name=connection_info.name_db)
         return redirect('user_list', db_id=db_id)
     cursor.close()
     conn.close()
@@ -411,7 +411,7 @@ def user_delete(request, db_id, username):
     except Exception as e:
         message = user_info_all_error()
         messages.error(request, f"{message}: {str(e)}")
-        create_audit_log(user_requester, 'delete', 'user', user_requester, f"{message}: {str(e)}")
+        create_audit_log(user_requester, 'delete', 'user', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
         return redirect('user_list', db_id=db_id)
     cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s;", [username])
     user_exists = cursor.fetchone()
@@ -420,7 +420,7 @@ def user_delete(request, db_id, username):
         conn.close()
         message = user_info_error(username)
         messages.error(request, message)
-        create_audit_log(user_requester, 'delete', 'user', user_requester, message)
+        create_audit_log(user_requester, 'delete', 'user', user_requester, message, database_name=connection_info.name_db)
         return redirect('user_list', db_id=db_id)
     user_log = UserLog.objects.filter(username=username).first()
     user_email = user_log.email if user_log else None
@@ -433,7 +433,7 @@ def user_delete(request, db_id, username):
             user_log.delete()
             message = delete_user_messages_success(username)
             messages.success(request, message)
-            create_audit_log(user_requester, 'delete', 'user', user_requester, message)
+            create_audit_log(user_requester, 'delete', 'user', user_requester, message, database_name=connection_info.name_db)
         send_email = SettingsProject.objects.first().send_email if SettingsProject.objects.exists() else False
         if user_email and send_email:
             subject = "Ваш аккаунт был удален"
@@ -443,12 +443,12 @@ def user_delete(request, db_id, username):
             email_message.send()
             message = delete_user_messages_email(username, send_email)
             messages.success(request, message)
-            create_audit_log(user_requester, 'delete', 'user', user_requester, message)
+            create_audit_log(user_requester, 'delete', 'user', user_requester, message, database_name=connection_info.name_db)
     except Exception as e:
         conn.rollback()
         message = delete_user_messages_error(username)
         messages.success(request, message)
-        create_audit_log(user_requester, 'delete', 'user', user_requester, f"{message}: {str(e)}")
+        create_audit_log(user_requester, 'delete', 'user', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
     finally:
         cursor.close()
         conn.close()

@@ -422,7 +422,7 @@ textarea:focus,
 .settings-table label { font-weight: 700; }
 .settings-table td:first-child { text-align: left; }
 
-#id_pagination_size { width: 60px !important; }
+#id_pagination_size { width: 70px !important; }
 
 .user-container {
     display: flex;

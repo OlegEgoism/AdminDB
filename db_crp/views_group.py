@@ -68,7 +68,7 @@ def group_list(request, db_id):
     except Exception as e:
         message = f"Ошибка подключения к группам: {str(e)}"
         messages.error(request, message)
-        create_audit_log(user_requester, 'info', 'group', user_requester, f"{message}: {str(e)}")
+        create_audit_log(user_requester, 'info', 'group', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
     return render(request, 'groups/group_list.html', {
         'user_groups_data': user_groups_data,
         'db_id': db_id
@@ -102,36 +102,29 @@ def group_create(request, db_id):
                         if cursor.fetchone():
                             message = create_group_messages_error(group_name)
                             messages.error(request, message)
-                            create_audit_log(user_requester, 'create', 'group', user_requester, message)
+                            create_audit_log(user_requester, 'create', 'group', user_requester, message, database_name=connection_info.name_db)
                             return render(request, 'groups/group_create.html', {'form': form, 'db_id': db_id})
-
                         if group_name.startswith('pg_'):
                             message = create_group_messages_error_pg(group_name)
                             messages.error(request, message)
-                            create_audit_log(user_requester, 'create', 'group', user_requester, message)
+                            create_audit_log(user_requester, 'create', 'group', user_requester, message, database_name=connection_info.name_db)
                             return render(request, 'groups/group_create.html', {'form': form, 'db_id': db_id})
-
-                        # Создаём роль в Postgres
                         cursor.execute(sql.SQL("CREATE ROLE {}").format(sql.Identifier(group_name)))
-
-                        # Сохраняем описание в Django модели
                         GroupLog.objects.create(
                             groupname=group_name,
-                            groupinfo=group_info,  # ← ДОБАВЛЕНО
+                            groupinfo=group_info,
                             created_at=created_at,
                             updated_at=timezone.now()
                         )
-
                         message = create_group_messages_group_success(group_name)
                         messages.success(request, message)
-                        create_audit_log(user_requester, 'create', 'group', user_requester, message)
-
+                        create_audit_log(user_requester, 'create', 'group', user_requester, message, database_name=connection_info.name_db)
                 return redirect('group_list', db_id=db_id)
 
             except Exception as e:
                 message = create_group_messages_error_info(group_name)
                 messages.error(request, f"{message}: {str(e)}")
-                create_audit_log(user_requester, 'create', 'group', user_requester, f"{message}: {str(e)}")
+                create_audit_log(user_requester, 'create', 'group', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
                 return render(request, 'groups/group_create.html', {'form': form, 'db_id': db_id})
 
     else:
@@ -162,7 +155,7 @@ def group_edit(request, db_id, group_name):
     if created:
         message = group_data(group_name)
         messages.success(request, message)
-        create_audit_log(user_requester, 'create', 'group', user_requester, message)
+        create_audit_log(user_requester, 'create', 'group', user_requester, message, database_name=connection_info.name_db)
 
     try:
         with psycopg2.connect(**temp_db_settings) as conn:
@@ -173,7 +166,7 @@ def group_edit(request, db_id, group_name):
                 if not cursor.fetchone():
                     message = edit_group_messages_error_info(group_name)
                     messages.error(request, message)
-                    create_audit_log(user_requester, 'update', 'group', user_requester, message)
+                    create_audit_log(user_requester, 'create', 'group', user_requester, message, database_name=connection_info.name_db)
                     return redirect('group_list', db_id=db_id)
 
                 # ====================== POST ======================
@@ -197,9 +190,7 @@ def group_edit(request, db_id, group_name):
                             message = edit_group_messages_success_pinfo(old_group_info, new_group_info)
                             messages.success(request, message)
 
-                            create_audit_log(
-                                user_requester, 'update', 'group', user_requester, message
-                            )
+                            create_audit_log(user_requester, 'create', 'group', user_requester, message, database_name=connection_info.name_db)
 
                             return redirect('group_list', db_id=db_id)
 
@@ -207,7 +198,7 @@ def group_edit(request, db_id, group_name):
                         if new_group_name.startswith('pg_'):
                             message = edit_group_messages_error_pg(group_name, new_group_name)
                             messages.error(request, message)
-                            create_audit_log(user_requester, 'update', 'group', user_requester, message)
+                            create_audit_log(user_requester, 'create', 'group', user_requester, message, database_name=connection_info.name_db)
                             return render(request, 'groups/group_edit.html', {
                                 'form': form, 'db_id': db_id, 'group_name': group_name
                             })
@@ -217,7 +208,7 @@ def group_edit(request, db_id, group_name):
                         if cursor.fetchone():
                             message = edit_group_messages_error_name(group_name, new_group_name)
                             messages.error(request, message)
-                            create_audit_log(user_requester, 'update', 'group', user_requester, message)
+                            create_audit_log(user_requester, 'create', 'group', user_requester, message, database_name=connection_info.name_db)
                             return render(request, 'groups/group_edit.html', {
                                 'form': form, 'db_id': db_id, 'group_name': group_name
                             })
@@ -239,7 +230,7 @@ def group_edit(request, db_id, group_name):
                         message = edit_group_messages_success_name(group_name, new_group_name)
                         messages.success(request, message)
 
-                        create_audit_log(user_requester, 'update', 'group', user_requester, message)
+                        create_audit_log(user_requester, 'create', 'group', user_requester, message, database_name=connection_info.name_db)
 
                         return redirect('group_list', db_id=db_id)
 
@@ -253,7 +244,7 @@ def group_edit(request, db_id, group_name):
     except Exception as e:
         message = edit_group_messages_error(group_name)
         messages.error(request, f"{message}: {str(e)}")
-        create_audit_log(user_requester, 'update', 'group', user_requester, f"{message}: {str(e)}")
+        create_audit_log(user_requester, 'update', 'group', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
         return redirect('group_list', db_id=db_id)
 
     return render(request, 'groups/group_edit.html', {
@@ -262,7 +253,6 @@ def group_edit(request, db_id, group_name):
         'group_name': group_name,
         'group_log': group_log
     })
-
 
 
 @login_required
@@ -328,7 +318,7 @@ def groups_edit_privileges_tables(request, db_id, group_name):
     except Exception as e:
         message = edit_group_messages_error(group_name)
         messages.error(request, f"{message}: {str(e)}")
-        create_audit_log(user_requester, 'update', 'group', user_requester, f"{message}: {str(e)}")
+        create_audit_log(user_requester, 'update', 'group', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
         return redirect('groups_edit_privileges_tables', db_id=db_id, group_name=group_name)
 
     # === POST: сохраняем права ===
@@ -392,13 +382,12 @@ def groups_edit_privileges_tables(request, db_id, group_name):
             if changes_log:
                 message = edit_groups_privileges_tables_success(group_name)
                 messages.success(request, message)
-                create_audit_log(user_requester, 'update', 'group', user_requester,
-                                 message + "\n" + "\n".join(changes_log))
+                create_audit_log(user_requester, 'update', 'group', user_requester, message + "\n" + "\n".join(changes_log), database_name=connection_info.name_db)
 
         except Exception as e:
             message = edit_groups_privileges_tables_error(group_name)
             messages.error(request, f"{message}: {str(e)}")
-            create_audit_log(user_requester, 'error', 'group', user_requester, f"{message}: {str(e)}")
+            create_audit_log(user_requester, 'error', 'group', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
             return redirect('groups_edit_privileges_tables', db_id=db_id, group_name=group_name)
 
         return redirect('group_list', db_id=db_id)
@@ -517,12 +506,12 @@ def group_delete(request, db_id, group_name):
 
         message = delete_group_messages_success(group_name)
         messages.success(request, message)
-        create_audit_log(user_requester, "delete", "group", user_requester, message)
+        create_audit_log(user_requester, "delete", "group", user_requester, message, database_name=connection_info.name_db)
 
     except Exception as e:
         message = delete_group_messages_error(group_name)
         messages.error(request, f"{message}: {str(e)}")
-        create_audit_log(user_requester, "error", "group", user_requester, f"{message}: {str(e)}")
+        create_audit_log(user_requester, "error", "group", user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
 
     return HttpResponseRedirect(reverse("group_list", kwargs={'db_id': db_id}))
 
@@ -547,7 +536,7 @@ def group_info(request, db_id, group_name):
                 if not cursor.fetchone():
                     message = edit_group_messages_error_info(group_name)
                     messages.error(request, message)
-                    create_audit_log(user_requester, 'info', 'group', user_requester, message)
+                    create_audit_log(user_requester, 'info', 'group', user_requester, message, database_name=connection_info.name_db)
                 cursor.execute("""
                     SELECT u.usename 
                     FROM pg_user u
@@ -559,7 +548,7 @@ def group_info(request, db_id, group_name):
     except Exception as e:
         message = edit_group_messages_error_info(group_name)
         messages.error(request, f"{message}: {str(e)}")
-        create_audit_log(user_requester, 'info', 'group', user_requester, f"{message}: {str(e)}")
+        create_audit_log(user_requester, 'info', 'group', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
 
     group_log, created = GroupLog.objects.get_or_create(
         groupname=group_name,
@@ -568,7 +557,7 @@ def group_info(request, db_id, group_name):
     if created:
         message = group_data(group_name)
         messages.success(request, message)
-        create_audit_log(user_requester, 'create', 'group', user_requester, message)
+        create_audit_log(user_requester, 'create', 'group', user_requester, message, database_name=connection_info.name_db)
 
     return render(request, 'groups/group_info.html', {
         'db_id': db_id,

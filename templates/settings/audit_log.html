@@ -64,6 +64,7 @@
                 <th>Пользователь</th>
                 <th>Действие</th>
                 <th>Объект</th>
+                <th>База данных</th>
                 <th>Название</th>
                 <th>Иннформация</th>
             </tr>
@@ -76,12 +77,13 @@
                     <td>{{ entry.username }}</td>
                     <td>{{ entry.get_action_type_display }}</td>
                     <td>{{ entry.get_entity_type_display }}</td>
+                    <td>{{ entry.database_name|default:"—" }}</td>
                     <td>{{ entry.entity_name }}</td>
                     <td>{{ entry.details }}</td>
                 </tr>
             {% empty %}
                 <tr>
-                    <td colspan="7" class="no-data">Нет данных</td>
+                    <td colspan="8" class="no-data">Нет данных</td>
                 </tr>
             {% endfor %}
             </tbody>

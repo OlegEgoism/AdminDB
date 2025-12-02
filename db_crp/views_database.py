@@ -233,8 +233,14 @@ def delete_temp_table(request, db_id, schema_name, table_name):
                 if row is None:
                     message = f"Таблица {schema_name}.{table_name} не найдена"
                     messages.error(request, message)
-                    create_audit_log(user_requester, 'error', 'table',
-                                     f"{schema_name}.{table_name}", message)
+                    create_audit_log(
+                        user_requester,
+                        'error',
+                        'table',
+                        f"{schema_name}.{table_name}",
+                        message,
+                        database_name=connection_info.name_db,
+                    )
                     return redirect('tables_list', db_id=db_id)
                 if isinstance(row, tuple) and len(row) == 0:
                     message = (
@@ -242,9 +248,14 @@ def delete_temp_table(request, db_id, schema_name, table_name):
                         f"{schema_name}.{table_name} — невозможно определить её тип"
                     )
                     messages.error(request, message)
-                    create_audit_log(user_requester, 'error', 'table',
-                                     f"{schema_name}.{table_name}", message)
-                    return redirect('tables_list', db_id=db_id)
+                    create_audit_log(
+                        user_requester,
+                        'error',
+                        'table',
+                        f"{schema_name}.{table_name}",
+                        message,
+                        database_name=connection_info.name_db,
+                    )
                 (_, _, _, persist_temp, schema_temp, name_tmp, name_temp) = row
                 is_temp = (
                         persist_temp
@@ -255,9 +266,14 @@ def delete_temp_table(request, db_id, schema_name, table_name):
                 if not is_temp:
                     message = "Можно удалять только временные таблицы"
                     messages.error(request, message)
-                    create_audit_log(user_requester, 'error', 'table',
-                                     f"{schema_name}.{table_name}", message)
-                    return redirect('tables_list', db_id=db_id)
+                    create_audit_log(
+                        user_requester,
+                        'error',
+                        'table',
+                        f"{schema_name}.{table_name}",
+                        message,
+                        database_name=connection_info.name_db,
+                    )
                 cursor.execute(
                     sql.SQL("DROP TABLE IF EXISTS {}.{};").format(
                         sql.Identifier(schema_name),
@@ -268,13 +284,25 @@ def delete_temp_table(request, db_id, schema_name, table_name):
                     f"Временная таблица {schema_name}.{table_name} успешно удалена"
                 )
                 messages.success(request, success_message)
-                create_audit_log(user_requester, 'delete', 'table',
-                                 f"{schema_name}.{table_name}", success_message)
+                create_audit_log(
+                    user_requester,
+                    'delete',
+                    'table',
+                    f"{schema_name}.{table_name}",
+                    success_message,
+                    database_name=connection_info.name_db,
+                )
     except Exception as e:
         message = f"Ошибка при удалении таблицы {schema_name}.{table_name}: {str(e)}"
         messages.error(request, message)
-        create_audit_log(user_requester, 'error', 'table',
-                         f"{schema_name}.{table_name}", message)
+        create_audit_log(
+            user_requester,
+            'error',
+            'table',
+            f"{schema_name}.{table_name}",
+            message,
+            database_name=connection_info.name_db,
+        )
     return redirect('tables_list', db_id=db_id)
 
 
@@ -292,7 +320,14 @@ def database_connect(request):
             info_db = form.cleaned_data['info_db']
             message = connect_data_base_success(name_db, user_db, port_db, host_db, info_db)
             messages.success(request, message)
-            create_audit_log(user_requester, 'create', 'database', name_db, message)
+            create_audit_log(
+                user_requester,
+                'create',
+                'database',
+                name_db,
+                message,
+                database_name=name_db,
+            )
             return redirect('database_list')
     else:
         form = DatabaseConnectForm()
@@ -315,7 +350,14 @@ def database_edit(request, db_id):
             info_db = form.cleaned_data['info_db']
             message = update_data_base_success(name_db, user_db, port_db, host_db, info_db)
             messages.success(request, message)
-            create_audit_log(user_requester, 'update', 'database', name_db, message)
+            create_audit_log(
+                user_requester,
+                'update',
+                'database',
+                name_db,
+                message,
+                database_name=name_db,
+            )
             return redirect('database_list')
     else:
         form = DatabaseConnectForm(instance=database)
@@ -339,11 +381,25 @@ def database_delete(request, db_id):
         database.delete()
         message = delete_data_base_success(name_db, user_db, port_db, host_db, info_db)
         messages.success(request, message)
-        create_audit_log(user_requester, 'delete', 'database', name_db, message)
+        create_audit_log(
+            user_requester,
+            'delete',
+            'database',
+            name_db,
+            message,
+            database_name=name_db,
+        )
     except Exception as e:
         message = delete_data_base_error(name_db, user_db, port_db, host_db, info_db)
         messages.success(request, f"{message}: {str(e)}")
-        create_audit_log(user_requester, 'delete', 'database', name_db, f"{message}: {str(e)}")
+        create_audit_log(
+            user_requester,
+            'delete',
+            'database',
+            name_db,
+            message,
+            database_name=name_db,
+        )
     return redirect('database_list')
 
 
@@ -403,11 +459,25 @@ def sync_users_and_groups(request, db_id):
             GroupLog.objects.bulk_create(new_groups)
         message = sync_data_base_success(temp_db_settings['dbname'])
         messages.success(request, message)
-        create_audit_log(user_requester, 'info', 'database', user_requester, message)
+        create_audit_log(
+            user_requester,
+            'info',
+            'database',
+            user_requester,
+            message,
+            database_name=connection_info.name_db,
+        )
     except Exception as e:
         message = sync_data_base_error(temp_db_settings['dbname'])
         messages.error(request, f"{message}: {str(e)}")
-        create_audit_log(user_requester, 'error', 'database', user_requester, f"{message}: {str(e)}")
+        create_audit_log(
+            user_requester,
+            'error',
+            'database',
+            user_requester,
+            f"{message}: {str(e)}",
+            database_name=connection_info.name_db,
+        )
     finally:
         if cursor is not None:
             cursor.close()

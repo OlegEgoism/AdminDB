@@ -10,7 +10,7 @@ from .audit_views import create_audit_log, logout_user_success, export_audit_log
 from .forms import SettingsProjectForm
 import xlsxwriter
 from django.http import HttpResponse
-from .models import Audit, SettingsProject, CustomUser
+from .models import Audit, SettingsProject, CustomUser, ConnectingDB
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -31,6 +31,7 @@ def audit_log(request):
     end_date = request.GET.get("end_date", "")
     page_number = request.GET.get("page", 1)
     audit_entries = Audit.objects.all().order_by('-timestamp')
+    database_name = ConnectingDB.objects.first().name_db if ConnectingDB.objects.exists() else ""
     if action_type:
         audit_entries = audit_entries.filter(action_type=action_type)
     if entity_type:
@@ -63,6 +64,7 @@ def audit_log(request):
         "search_query": search_query,
         "start_date": start_date,
         "end_date": end_date,
+        "database_name": database_name
     })
 
 
@@ -70,12 +72,14 @@ def audit_log(request):
 def audit_log_export(request):
     """Аудит приложения экспорт в Excel"""
     user_requester = request.user.username if request.user.is_authenticated else "Аноним"
+
     action_type = request.GET.get("action_type", "")
     entity_type = request.GET.get("entity_type", "")
     username = request.GET.get("username", "")
     search_query = request.GET.get("search", "")
     start_date = request.GET.get("start_date", "")
     end_date = request.GET.get("end_date", "")
+
     audit_entries = Audit.objects.all()
     if action_type:
         audit_entries = audit_entries.filter(action_type=action_type)
@@ -84,7 +88,9 @@ def audit_log_export(request):
     if username:
         audit_entries = audit_entries.filter(username=username)
     if search_query:
-        audit_entries = audit_entries.filter(Q(entity_name__icontains=search_query) | Q(details__icontains=search_query))
+        audit_entries = audit_entries.filter(
+            Q(entity_name__icontains=search_query) | Q(details__icontains=search_query)
+        )
     if start_date:
         start_date_parsed = parse_date(start_date)
         if start_date_parsed:
@@ -93,29 +99,53 @@ def audit_log_export(request):
         end_date_parsed = parse_date(end_date)
         if end_date_parsed:
             audit_entries = audit_entries.filter(timestamp__date__lte=end_date_parsed)
-    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+    # Берём БД, к которой логически относится действие (если нужно – конкретную по id)
+    connection_info = ConnectingDB.objects.first()
+    db_name = connection_info.name_db if connection_info else None
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
     response['Content-Disposition'] = 'attachment; filename=audit_log_filtered.xlsx'
+
     workbook = xlsxwriter.Workbook(response, {'in_memory': True})
     worksheet = workbook.add_worksheet('Audit Log')
+
     if worksheet:
         message = export_audit_log_success(user_requester)
-        create_audit_log(user_requester, 'download', 'settings', user_requester, message)
-    headers = ["Дата", "Пользователь", "Действие", "Объект", "Название", "Информация"]
+        # <<< ВАЖНО: добавили db_name шестым аргументом
+        create_audit_log(
+            user_requester,
+            'download',
+            'settings',
+            user_requester,
+            message,
+            db_name,
+        )
+
+    headers = ["Дата", "Пользователь", "Действие", "Объект", "База данных", "Название", "Информация"]
     for col_num, header in enumerate(headers):
         worksheet.write(0, col_num, header)
+
     for row_num, entry in enumerate(audit_entries, start=1):
         row_data = [
             entry.timestamp.replace(tzinfo=None) if entry.timestamp else "",
             entry.username,
             entry.get_action_type_display(),
             entry.get_entity_type_display(),
+            entry.database_name or "",   # ← читаем уже из модели
             entry.entity_name or "",
-            entry.details or ""
+            entry.details or "",
         ]
         for col_num, cell_value in enumerate(row_data):
             worksheet.write(row_num, col_num, str(cell_value) if cell_value else "")
+
     workbook.close()
     return response
+
+
+
 
 
 @login_required

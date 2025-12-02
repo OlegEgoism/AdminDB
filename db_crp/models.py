@@ -85,6 +85,7 @@ class Audit(models.Model):
     entity_name = models.CharField(verbose_name="Имя объекта", max_length=150, blank=True, null=True)
     timestamp = models.DateTimeField(verbose_name="Дата и время", default=now)
     details = models.TextField(verbose_name="Подробности", blank=True, null=True)
+    database_name = models.CharField(verbose_name="База данных", max_length=150, blank=True, null=True)
 
     def __str__(self):
         return f"{self.timestamp} - {self.username} {self.get_action_type_display()} {self.get_entity_type_display()} '{self.entity_name}'"
