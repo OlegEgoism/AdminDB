@@ -7,18 +7,21 @@
             <h2 class="welcome-title">Список пользователей ({{ page_obj.paginator.count }} шт.)</h2>
 
             <div style="display: flex; align-items: center; gap: 10px;">
-                <!-- Поиск: обычная форма, отправляется по Enter -->
+                <!-- Поиск -->
                 <form method="get" action="" class="search-form" style="position: relative;">
                     <input type="text"
+                           id="userSearch"
                            name="search"
                            class="user-search"
                            value="{{ request.GET.search }}"
                            placeholder="Поиск пользователя..."
-                           style="width: 320px;" />
-                    <!-- Кнопка очистки (опционально, без JS — просто ссылка на ту же страницу без search) -->
-                    {% if request.GET.search %}
-                        <a href="?"
-                           style="
+                           style="width: 320px;"
+                           oninput="toggleClearButton()" />
+
+                    <!-- Кнопка очистки -->
+                    <span id="clearSearchBtn"
+                          onclick="clearSearch()"
+                          style="
                               position: absolute;
                               right: 8px;
                               top: 50%;
@@ -26,10 +29,10 @@
                               cursor: pointer;
                               font-size: 16px;
                               color: #e81717;
+                              display: none;
                           ">
-                            &#10006;
-                        </a>
-                    {% endif %}
+                        &#10006;
+                    </span>
                 </form>
 
                 <a href="{% url 'user_create' db_id=db_id %}" class="btn btn-save">Создать пользователя</a>
@@ -37,10 +40,12 @@
         </div>
         <hr>
 
+        <!-- Вывод сообщений об ошибках -->
         {% if messages %}
             <div class="messages">
                 {% for message in messages %}
-                    <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-error{% endif %}">
+                    <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-error{% endif %}"
+                         role="alert">
                         {{ message }}
                     </div>
                 {% endfor %}
@@ -86,7 +91,7 @@
         </div>
         <br>
 
-        <!-- Пагинация с сохранением search -->
+        <!-- Пагинация -->
         <div class="pagination">
             {% if page_obj.has_previous %}
                 <a href="?page=1{% if request.GET.search %}&search={{ request.GET.search|urlencode }}{% endif %}" class="btn btn-page">Первая</a>
@@ -103,4 +108,23 @@
             <a href="{% url 'database_list' %}" class="btn btn-cancel">Назад</a>
         </div>
     </div>
+
+    <script>
+        function toggleClearButton() {
+            const input = document.getElementById("userSearch");
+            const btn = document.getElementById("clearSearchBtn");
+            btn.style.display = input.value.trim() !== "" ? "block" : "none";
+        }
+
+        function clearSearch() {
+            const url = new URL(window.location);
+            url.searchParams.delete('search');
+            url.searchParams.delete('page');
+            window.location.href = url.toString();
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            toggleClearButton();
+        });
+    </script>
 {% endblock %}
