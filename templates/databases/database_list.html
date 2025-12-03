@@ -8,6 +8,7 @@
 
             <div style="display: flex; align-items: center; gap: 10px;">
                 <!-- Поиск -->
+                <!-- Поиск -->
                 <form method="get" action="" class="search-form" id="searchForm" style="position: relative;">
                     <input type="text"
                            id="databaseSearch"
@@ -15,23 +16,22 @@
                            class="group-search"
                            value="{{ search_query }}"
                            placeholder="Поиск базы данных..."
-                           oninput="filterDatabases(); toggleClearButton()"/>
-
+                           style="width: 320px;"/>
                     <!-- Кнопка очистки -->
                     <span id="clearSearchBtn"
                           onclick="clearSearch()"
                           style="
-                      position: absolute;
-                      right: 8px;
-                      top: 50%;
-                      transform: translateY(-50%);
-                      cursor: pointer;
-                      font-size: 16px;
-                      color: #e81717;
-                      display: none;
-                  ">
-                &#10006;
-            </span>
+              position: absolute;
+              right: 8px;
+              top: 50%;
+              transform: translateY(-50%);
+              cursor: pointer;
+              font-size: 16px;
+              color: #e81717;
+              display: none;
+          ">
+        &#10006;
+    </span>
                 </form>
 
                 <a href="{% url 'database_connect' %}" class="btn btn-save">Создать новое подключение</a>
@@ -113,49 +113,65 @@
         </div>
     </div>
 
-    <script>
-        function filterDatabases() {
-            let input = document.getElementById("databaseSearch").value.toLowerCase();
-            let items = document.querySelectorAll("#databaseList .group-item");
+<script>
+    function filterDatabases() {
+        let input = document.getElementById("databaseSearch").value.toLowerCase();
+        let items = document.querySelectorAll("#databaseList .group-item");
 
-            items.forEach(item => {
-                let info = item.querySelector(".group-dates a")?.textContent.toLowerCase() || "";
-                let name = item.querySelector(".group-name")?.textContent.toLowerCase() || "";
-                let host = item.querySelectorAll(".group-dates small")[2]?.textContent.toLowerCase() || "";
-                let port = item.querySelectorAll(".group-dates small")[3]?.textContent.toLowerCase() || "";
+        items.forEach(item => {
+            let info = item.querySelector(".group-dates a")?.textContent.toLowerCase() || "";
+            let name = item.querySelector(".group-name p")?.textContent.toLowerCase() || ""; // уточнено: ищем внутри <p>
+            let host = item.querySelectorAll(".group-dates small")[2]?.textContent.toLowerCase() || "";
+            let port = item.querySelectorAll(".group-dates small")[3]?.textContent.toLowerCase() || "";
 
-                if (
-                    info.includes(input) ||
-                    name.includes(input) ||
-                    host.includes(input) ||
-                    port.includes(input)
-                ) {
-                    item.style.display = "";
-                } else {
-                    item.style.display = "none";
-                }
-            });
-        }
-
-        function toggleClearButton() {
-            const input = document.getElementById("databaseSearch");
-            const btn = document.getElementById("clearSearchBtn");
-
-            btn.style.display = input.value.trim() !== "" ? "block" : "none";
-        }
-
-        function clearSearch() {
-            const input = document.getElementById("databaseSearch");
-            input.value = "";
-            toggleClearButton();
-            filterDatabases();
-        }
-
-        document.addEventListener("DOMContentLoaded", () => {
-            toggleClearButton();
-            filterDatabases(); // если уже был search_query
+            if (
+                info.includes(input) ||
+                name.includes(input) ||
+                host.includes(input) ||
+                port.includes(input)
+            ) {
+                item.style.display = "";
+            } else {
+                item.style.display = "none";
+            }
         });
-    </script>
+    }
+
+    function toggleClearButton() {
+        const input = document.getElementById("databaseSearch");
+        const btn = document.getElementById("clearSearchBtn");
+        btn.style.display = input.value.trim() !== "" ? "block" : "none";
+    }
+
+    function clearSearch() {
+        const input = document.getElementById("databaseSearch");
+        input.value = "";
+        toggleClearButton();
+        filterDatabases();
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const searchForm = document.getElementById("searchForm");
+        const searchInput = document.getElementById("databaseSearch");
+
+        // Показать/скрыть кнопку очистки при загрузке
+        toggleClearButton();
+        // Применить фильтр при загрузке (если search_query уже есть)
+        filterDatabases();
+
+        // Обработка нажатия Enter
+        searchInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault(); // предотвращаем отправку формы (если не нужно перезагружать страницу)
+                filterDatabases();
+                toggleClearButton();
+            }
+        });
+
+        // Обновление кнопки очистки при вводе (но не фильтрация!)
+        searchInput.addEventListener("input", toggleClearButton);
+    });
+</script>
 
 
 {% endblock %}

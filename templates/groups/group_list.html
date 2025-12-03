@@ -13,7 +13,7 @@
                        id="groupSearch"
                        class="group-search"
                        placeholder="Поиск группы..."
-                       oninput="filterGroups(); toggleClearButton()" />
+                       style="width: 320px;" />
 
                 <!-- Кнопка очистки -->
                 <span id="clearGroupSearchBtn"
@@ -114,12 +114,12 @@
 
 <script>
     function filterGroups() {
-        let input = document.getElementById("groupSearch");
-        let filter = input.value.toLowerCase();
-        let items = document.querySelectorAll(".group-item");
+        const input = document.getElementById("groupSearch");
+        const filter = input.value.toLowerCase();
+        const items = document.querySelectorAll(".group-item");
 
         items.forEach(item => {
-            let groupName = item.querySelector(".group-name a").textContent.toLowerCase();
+            const groupName = item.querySelector(".group-name a")?.textContent.toLowerCase() || "";
             item.style.display = groupName.includes(filter) ? "" : "none";
         });
     }
@@ -127,7 +127,6 @@
     function toggleClearButton() {
         const input = document.getElementById("groupSearch");
         const btn = document.getElementById("clearGroupSearchBtn");
-
         btn.style.display = input.value.trim() !== "" ? "block" : "none";
     }
 
@@ -138,7 +137,23 @@
         filterGroups();
     }
 
-    document.addEventListener("DOMContentLoaded", toggleClearButton);
+    document.addEventListener("DOMContentLoaded", () => {
+        const searchInput = document.getElementById("groupSearch");
+
+        // Обновление кнопки очистки при вводе
+        searchInput.addEventListener("input", toggleClearButton);
+
+        // Фильтрация по Enter
+        searchInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault(); // предотвращаем отправку формы (если она есть)
+                filterGroups();
+            }
+        });
+
+        // Инициализация кнопки очистки
+        toggleClearButton();
+    });
 </script>
 
 {% endblock %}
