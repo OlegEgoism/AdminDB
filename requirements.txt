@@ -1,8 +1,6 @@
 asgiref==3.8.1
 beautifulsoup4==4.13.3
 Django==4.1
-djangorestframework==3.16.1
-drf-yasg==1.21.11
 inflection==0.5.1
 numpy==2.2.6
 packaging==25.0
