@@ -112,13 +112,11 @@ def user_create(request, db_id):
                     messages.error(request, message)
                     create_audit_log(user_requester, 'create', 'user', user_requester, message, database_name=connection_info.name_db)
                     return render(request, 'users/user_create.html', {'form': form, 'db_id': db_id})
-
                 if email and UserLog.objects.filter(email=email).exists():
                     message = create_user_messages_error_email(username, email)
                     messages.error(request, message)
                     create_audit_log(user_requester, 'create', 'user', user_requester, message, database_name=connection_info.name_db)
                     return render(request, 'users/user_create.html', {'form': form, 'db_id': db_id})
-
                 privileges = ' '.join([
                     'CREATEDB' if can_create_db else 'NOCREATEDB',
                     'SUPERUSER' if is_superuser else 'NOSUPERUSER',
@@ -176,7 +174,6 @@ def user_create(request, db_id):
                 messages.error(request, f"{message}: {str(e)}")
                 create_audit_log(user_requester, 'error', 'user', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
                 return render(request, 'users/user_create.html', {'form': form, 'db_id': db_id})
-
     else:
         form = UserCreateForm()
     return render(request, 'users/user_create.html', {
@@ -358,7 +355,6 @@ def user_edit(request, db_id, username):
             {'BYPASSRLS' if role_permissions['bypass_rls'] else 'NOBYPASSRLS'};
         """)
         conn.commit()
-        # selected_groups = set(request.POST.getlist('selected_groups'))
         selected_groups = {g.strip() for g in request.POST.getlist('selected_groups') if g.strip()}
         deleted_groups = current_groups - selected_groups
         new_groups = selected_groups - current_groups

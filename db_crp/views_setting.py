@@ -72,14 +72,12 @@ def audit_log(request):
 def audit_log_export(request):
     """Аудит приложения экспорт в Excel"""
     user_requester = request.user.username if request.user.is_authenticated else "Аноним"
-
     action_type = request.GET.get("action_type", "")
     entity_type = request.GET.get("entity_type", "")
     username = request.GET.get("username", "")
     search_query = request.GET.get("search", "")
     start_date = request.GET.get("start_date", "")
     end_date = request.GET.get("end_date", "")
-
     audit_entries = Audit.objects.all()
     if action_type:
         audit_entries = audit_entries.filter(action_type=action_type)
@@ -88,9 +86,7 @@ def audit_log_export(request):
     if username:
         audit_entries = audit_entries.filter(username=username)
     if search_query:
-        audit_entries = audit_entries.filter(
-            Q(entity_name__icontains=search_query) | Q(details__icontains=search_query)
-        )
+        audit_entries = audit_entries.filter(Q(entity_name__icontains=search_query) | Q(details__icontains=search_query))
     if start_date:
         start_date_parsed = parse_date(start_date)
         if start_date_parsed:
@@ -99,22 +95,16 @@ def audit_log_export(request):
         end_date_parsed = parse_date(end_date)
         if end_date_parsed:
             audit_entries = audit_entries.filter(timestamp__date__lte=end_date_parsed)
-
-    # Берём БД, к которой логически относится действие (если нужно – конкретную по id)
     connection_info = ConnectingDB.objects.first()
     db_name = connection_info.name_db if connection_info else None
-
     response = HttpResponse(
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
     response['Content-Disposition'] = 'attachment; filename=audit_log_filtered.xlsx'
-
     workbook = xlsxwriter.Workbook(response, {'in_memory': True})
     worksheet = workbook.add_worksheet('Audit Log')
-
     if worksheet:
         message = export_audit_log_success(user_requester)
-        # <<< ВАЖНО: добавили db_name шестым аргументом
         create_audit_log(
             user_requester,
             'download',
@@ -123,11 +113,9 @@ def audit_log_export(request):
             message,
             db_name,
         )
-
     headers = ["Дата", "Пользователь", "Действие", "Объект", "База данных", "Название", "Информация"]
     for col_num, header in enumerate(headers):
         worksheet.write(0, col_num, header)
-
     for row_num, entry in enumerate(audit_entries, start=1):
         row_data = [
             entry.timestamp.replace(tzinfo=None) if entry.timestamp else "",
@@ -140,7 +128,6 @@ def audit_log_export(request):
         ]
         for col_num, cell_value in enumerate(row_data):
             worksheet.write(row_num, col_num, str(cell_value) if cell_value else "")
-
     workbook.close()
     return response
 
@@ -250,7 +237,10 @@ def admin_edit(request, admin_id):
             return redirect('admin_info')
     else:
         form = CustomUserForm(instance=admin_user)
-    return render(request, 'settings/admin_edit.html', {'form': form, 'admin_user': admin_user})
+    return render(request, 'settings/admin_edit.html', {
+        'form': form,
+        'admin_user': admin_user
+    })
 
 
 @login_required

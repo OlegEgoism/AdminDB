@@ -80,7 +80,6 @@ def group_create(request, db_id):
     """Создание группы"""
     user_requester = request.user.username if request.user.is_authenticated else "Аноним"
     connection_info = get_object_or_404(ConnectingDB, id=db_id)
-
     temp_db_settings = {
         'dbname': connection_info.name_db,
         'user': connection_info.user_db,
@@ -88,13 +87,11 @@ def group_create(request, db_id):
         'host': connection_info.host_db,
         'port': connection_info.port_db,
     }
-
     if request.method == "POST":
         form = CreateGroupForm(request.POST)
         if form.is_valid():
             group_name = form.cleaned_data['groupname']
-            group_info = form.cleaned_data['groupinfo']  # ← ВАЖНО
-
+            group_info = form.cleaned_data['groupinfo']
             try:
                 with psycopg2.connect(**temp_db_settings) as conn:
                     with conn.cursor() as cursor:
@@ -120,17 +117,16 @@ def group_create(request, db_id):
                         messages.success(request, message)
                         create_audit_log(user_requester, 'create', 'group', user_requester, message, database_name=connection_info.name_db)
                 return redirect('group_list', db_id=db_id)
-
             except Exception as e:
                 message = create_group_messages_error_info(group_name)
                 messages.error(request, f"{message}: {str(e)}")
                 create_audit_log(user_requester, 'create', 'group', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
                 return render(request, 'groups/group_create.html', {'form': form, 'db_id': db_id})
-
     else:
         form = CreateGroupForm()
-
-    return render(request, 'groups/group_create.html', {'form': form, 'db_id': db_id})
+    return render(request, 'groups/group_create.html', {
+        'form': form, 'db_id': db_id
+    })
 
 
 @login_required
@@ -138,7 +134,6 @@ def group_edit(request, db_id, group_name):
     """Редактирование группы"""
     user_requester = request.user.username if request.user.is_authenticated else "Аноним"
     connection_info = get_object_or_404(ConnectingDB, id=db_id)
-
     temp_db_settings = {
         'dbname': connection_info.name_db,
         'user': connection_info.user_db,
@@ -146,64 +141,46 @@ def group_edit(request, db_id, group_name):
         'host': connection_info.host_db,
         'port': connection_info.port_db,
     }
-
     group_log, created = GroupLog.objects.get_or_create(
         groupname=group_name,
         defaults={'created_at': created_at, 'updated_at': timezone.now()}
     )
-
     if created:
         message = group_data(group_name)
         messages.success(request, message)
         create_audit_log(user_requester, 'create', 'group', user_requester, message, database_name=connection_info.name_db)
-
     try:
         with psycopg2.connect(**temp_db_settings) as conn:
             with conn.cursor() as cursor:
-
-                # Проверяем, что роль существует в БД
                 cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s;", [group_name])
                 if not cursor.fetchone():
                     message = edit_group_messages_error_info(group_name)
                     messages.error(request, message)
                     create_audit_log(user_requester, 'create', 'group', user_requester, message, database_name=connection_info.name_db)
                     return redirect('group_list', db_id=db_id)
-
-                # ====================== POST ======================
                 if request.method == "POST":
                     form = GroupEditForm(request.POST)
-
                     if form.is_valid():
                         new_group_name = form.cleaned_data['groupname']
                         new_group_info = form.cleaned_data['groupinfo']
-
-                        # Сохраняем старое описание
                         old_group_info = group_log.groupinfo
-
-                        # === 1. Если имя НЕ меняется — обновляем только описание ===
                         if new_group_name == group_name:
                             group_log.groupinfo = new_group_info
                             group_log.updated_at = timezone.now()
                             group_log.save()
-
-                            # ⬇️ Используем старое и новое описание
                             message = edit_group_messages_success_pinfo(old_group_info, new_group_info)
                             messages.success(request, message)
-
                             create_audit_log(user_requester, 'create', 'group', user_requester, message, database_name=connection_info.name_db)
-
                             return redirect('group_list', db_id=db_id)
-
-                        # === 2. защита от pg_ ===
                         if new_group_name.startswith('pg_'):
                             message = edit_group_messages_error_pg(group_name, new_group_name)
                             messages.error(request, message)
                             create_audit_log(user_requester, 'create', 'group', user_requester, message, database_name=connection_info.name_db)
                             return render(request, 'groups/group_edit.html', {
-                                'form': form, 'db_id': db_id, 'group_name': group_name
+                                'form': form,
+                                'db_id': db_id,
+                                'group_name': group_name
                             })
-
-                        # === 3. Проверка существующей роли ===
                         cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s;", [new_group_name])
                         if cursor.fetchone():
                             message = edit_group_messages_error_name(group_name, new_group_name)
@@ -212,41 +189,30 @@ def group_edit(request, db_id, group_name):
                             return render(request, 'groups/group_edit.html', {
                                 'form': form, 'db_id': db_id, 'group_name': group_name
                             })
-
-                        # === 4. Переименование роли в PostgreSQL ===
                         cursor.execute(
                             sql.SQL("ALTER ROLE {} RENAME TO {}").format(
                                 sql.Identifier(group_name),
                                 sql.Identifier(new_group_name)
                             )
                         )
-
-                        # === 5. Сохраняем данные в Django ===
                         group_log.groupname = new_group_name
                         group_log.groupinfo = new_group_info
                         group_log.updated_at = timezone.now()
                         group_log.save()
-
                         message = edit_group_messages_success_name(group_name, new_group_name)
                         messages.success(request, message)
-
                         create_audit_log(user_requester, 'create', 'group', user_requester, message, database_name=connection_info.name_db)
-
                         return redirect('group_list', db_id=db_id)
-
-                # ====================== GET ======================
                 else:
                     form = GroupEditForm(initial={
                         'groupname': group_log.groupname,
                         'groupinfo': group_log.groupinfo,
                     })
-
     except Exception as e:
         message = edit_group_messages_error(group_name)
         messages.error(request, f"{message}: {str(e)}")
         create_audit_log(user_requester, 'update', 'group', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
         return redirect('group_list', db_id=db_id)
-
     return render(request, 'groups/group_edit.html', {
         'form': form,
         'db_id': db_id,
@@ -267,69 +233,49 @@ def groups_edit_privileges_tables(request, db_id, group_name):
         'host': connection_info.host_db,
         'port': connection_info.port_db,
     }
-
     tables_by_schema = {}
     granted_tables = {}
-
-    # Системные схемы, которые НЕ нужно показывать
     SYSTEM_SCHEMAS = {
         "pg_catalog", "information_schema", "pg_toast", "pg_temp_1", "pg_toast_temp_1",
         "gp_toolkit", "pg_bitmapindex", "pg_aoseg", "pg_exttable", "pg_internal",
         "pg_brin", "pglogical", "pg_prewarm"
     }
-
     try:
         with psycopg2.connect(**temp_db_settings) as conn:
             with conn.cursor() as cursor:
-
-                # 1. Получаем ВСЕ схемы
                 cursor.execute("SELECT schema_name FROM information_schema.schemata;")
                 schemas_raw = {row[0] for row in cursor.fetchall()}
-
-                # 2. Фильтруем системные и временные
                 schemas = sorted([
                     s for s in schemas_raw
                     if s not in SYSTEM_SCHEMAS and not s.startswith("pg_temp")
                 ])
-
-                # 3. Получаем таблицы по схемам
                 if schemas:
                     cursor.execute("""
                         SELECT schemaname, tablename
                         FROM pg_catalog.pg_tables
                         WHERE schemaname = ANY(%s);
                     """, (schemas,))
-
                     for schema, table in cursor.fetchall():
                         tables_by_schema.setdefault(schema, {})[table] = set()
-
-                # 4. Получаем права группы
                 cursor.execute("""
                     SELECT table_schema, table_name, privilege_type
                     FROM information_schema.role_table_grants
                     WHERE grantee = %s;
                 """, [group_name])
-
                 for schema, table, privilege in cursor.fetchall():
                     if schema in tables_by_schema and table in tables_by_schema[schema]:
                         tables_by_schema[schema][table].add(privilege)
                         granted_tables.setdefault(schema, {}).setdefault(table, set()).add(privilege)
-
     except Exception as e:
         message = edit_group_messages_error(group_name)
         messages.error(request, f"{message}: {str(e)}")
         create_audit_log(user_requester, 'update', 'group', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
         return redirect('groups_edit_privileges_tables', db_id=db_id, group_name=group_name)
-
-    # === POST: сохраняем права ===
     if request.method == "POST":
         changes_log = []
-
         try:
             with psycopg2.connect(**temp_db_settings) as conn:
                 with conn.cursor() as cursor:
-
-                    # 1. REVOKE ALL
                     for schema, tables in tables_by_schema.items():
                         for table in tables:
                             cursor.execute(
@@ -339,25 +285,18 @@ def groups_edit_privileges_tables(request, db_id, group_name):
                                     sql.Identifier(group_name)
                                 )
                             )
-
-                    # 2. GRANT выбранных прав
                     for key, raw_permissions in request.POST.items():
                         if not key.startswith("permissions_"):
                             continue
-
                         schema_name, table_name = key[len("permissions_"):].split(".", 1)
-
                         if schema_name not in tables_by_schema:
                             continue
                         if table_name not in tables_by_schema[schema_name]:
                             continue
-
                         new_perms = request.POST.getlist(key)
                         valid_perms = [p for p in new_perms if p in ALLOWED_TABLE_PRIVILEGES]
-
                         if not valid_perms:
                             continue
-
                         cursor.execute(
                             sql.SQL("GRANT {} ON TABLE {}.{} TO {}").format(
                                 sql.SQL(', ').join(sql.SQL(p) for p in valid_perms),
@@ -366,40 +305,32 @@ def groups_edit_privileges_tables(request, db_id, group_name):
                                 sql.Identifier(group_name)
                             )
                         )
-
                         old_perms = granted_tables.get(schema_name, {}).get(table_name, set())
                         new_set = set(valid_perms)
                         added = new_set - old_perms
                         removed = old_perms - new_set
-
                         if added or removed:
                             changes_log.append(
                                 f"Изменены права на {schema_name}.{table_name}: "
                                 f"Добавлены: {', '.join(added) if added else '—'} | "
                                 f"Удалены: {', '.join(removed) if removed else '—'}"
                             )
-
             if changes_log:
                 message = edit_groups_privileges_tables_success(group_name)
                 messages.success(request, message)
                 create_audit_log(user_requester, 'update', 'group', user_requester, message + "\n" + "\n".join(changes_log), database_name=connection_info.name_db)
-
         except Exception as e:
             message = edit_groups_privileges_tables_error(group_name)
             messages.error(request, f"{message}: {str(e)}")
             create_audit_log(user_requester, 'error', 'group', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
             return redirect('groups_edit_privileges_tables', db_id=db_id, group_name=group_name)
-
         return redirect('group_list', db_id=db_id)
-
-    # сортируем схемы
     tables_by_schema = dict(sorted(tables_by_schema.items()))
-
     return render(request, "groups/groups_edit_privileges_tables.html", {
         'db_id': db_id,
         'group_name': group_name,
         'db_name': connection_info.name_db,
-        'schemas': list(tables_by_schema.keys()),  # очищенные схемы
+        'schemas': list(tables_by_schema.keys()),
         'tables_by_schema': tables_by_schema,
     })
 
@@ -407,10 +338,8 @@ def groups_edit_privileges_tables(request, db_id, group_name):
 @login_required
 def group_delete(request, db_id, group_name):
     """Универсальное удаление роли без ошибок зависимостей"""
-
     user_requester = request.user.username if request.user.is_authenticated else "Аноним"
     connection_info = get_object_or_404(ConnectingDB, id=db_id)
-
     temp_db_settings = {
         'dbname': connection_info.name_db,
         'user': connection_info.user_db,
@@ -418,25 +347,18 @@ def group_delete(request, db_id, group_name):
         'host': connection_info.host_db,
         'port': connection_info.port_db,
     }
-
     try:
         with psycopg2.connect(**temp_db_settings) as conn:
             conn.autocommit = True
             with conn.cursor() as cursor:
-
-                # 1. Проверяем, что роль существует
                 cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s;", [group_name])
                 if not cursor.fetchone():
                     messages.error(request, f"Роль {group_name} не существует")
                     return redirect("group_list", db_id=db_id)
-
-                # 2. Удаляем членство в других группах
                 cursor.execute("""
                     DELETE FROM pg_auth_members 
                     WHERE member = (SELECT oid FROM pg_roles WHERE rolname = %s);
                 """, [group_name])
-
-                # 3. Получаем только пользовательские схемы
                 cursor.execute("""
                     SELECT nspname 
                     FROM pg_namespace 
@@ -444,25 +366,16 @@ def group_delete(request, db_id, group_name):
                     AND nspname != 'information_schema';
                 """)
                 schemas = [row[0] for row in cursor.fetchall()]
-
-                # 4. Массовый REVOKE (таблицы, последовательности, функции)
                 for schema in schemas:
-                    # 1. REVOKE ALL privileges from tables
                     cursor.execute(sql.SQL(
                         "REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA {} FROM {}"
                     ).format(sql.Identifier(schema), sql.Identifier(group_name)))
-
-                    # 2. REVOKE ALL privileges from sequences
                     cursor.execute(sql.SQL(
                         "REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA {} FROM {}"
                     ).format(sql.Identifier(schema), sql.Identifier(group_name)))
-
-                    # 3. REVOKE ALL privileges from functions
                     cursor.execute(sql.SQL(
                         "REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA {} FROM {}"
                     ).format(sql.Identifier(schema), sql.Identifier(group_name)))
-
-                    # 4. FIX: корректный REVOKE default privileges
                     cursor.execute("""
                         SELECT DISTINCT pg_get_userbyid(c.relowner)
                         FROM pg_class c
@@ -470,9 +383,7 @@ def group_delete(request, db_id, group_name):
                         WHERE n.nspname = %s
                           AND c.relkind IN ('r','v','m','S','f');
                     """, [schema])
-
                     owners = [row[0] for row in cursor.fetchall() if row[0]]
-
                     for owner in owners:
                         cursor.execute(sql.SQL("""
                             ALTER DEFAULT PRIVILEGES FOR ROLE {} IN SCHEMA {}
@@ -482,37 +393,27 @@ def group_delete(request, db_id, group_name):
                             sql.Identifier(schema),
                             sql.Identifier(group_name)
                         ))
-
-                # 5. Переназначаем владельцев объектов
                 cursor.execute("""
                     SELECT n.nspname, c.relname
                     FROM pg_class c
                     JOIN pg_namespace n ON n.oid = c.relnamespace
                     WHERE c.relowner = (SELECT oid FROM pg_roles WHERE rolname = %s)
                 """, [group_name])
-
                 for schema, obj in cursor.fetchall():
                     cursor.execute(sql.SQL(
                         "ALTER TABLE {}.{} OWNER TO postgres"
                     ).format(sql.Identifier(schema), sql.Identifier(obj)))
-
-                # 6. Удаляем роль
                 cursor.execute(sql.SQL("DROP ROLE {};").format(sql.Identifier(group_name)))
-
-        # Удаляем запись в Django
         group_log = GroupLog.objects.filter(groupname=group_name).first()
         if group_log:
             group_log.delete()
-
         message = delete_group_messages_success(group_name)
         messages.success(request, message)
         create_audit_log(user_requester, "delete", "group", user_requester, message, database_name=connection_info.name_db)
-
     except Exception as e:
         message = delete_group_messages_error(group_name)
         messages.error(request, f"{message}: {str(e)}")
         create_audit_log(user_requester, "error", "group", user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
-
     return HttpResponseRedirect(reverse("group_list", kwargs={'db_id': db_id}))
 
 
@@ -549,7 +450,6 @@ def group_info(request, db_id, group_name):
         message = edit_group_messages_error_info(group_name)
         messages.error(request, f"{message}: {str(e)}")
         create_audit_log(user_requester, 'info', 'group', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
-
     group_log, created = GroupLog.objects.get_or_create(
         groupname=group_name,
         defaults={'created_at': created_at, 'updated_at': timezone.now()}
@@ -558,7 +458,6 @@ def group_info(request, db_id, group_name):
         message = group_data(group_name)
         messages.success(request, message)
         create_audit_log(user_requester, 'create', 'group', user_requester, message, database_name=connection_info.name_db)
-
     return render(request, 'groups/group_info.html', {
         'db_id': db_id,
         'group_name': group_name,

@@ -44,7 +44,6 @@ class CustomUserAdmin(admin.ModelAdmin):
 class GroupLogAdmin(admin.ModelAdmin):
     """Группы в базе данных"""
     list_display = 'groupname', 'created_at', 'updated_at'
-    # readonly_fields = 'groupname', 'created_at', 'updated_at'
     search_fields = 'groupname',
     search_help_text = 'Поиск по имени группы'
     date_hierarchy = 'created_at'

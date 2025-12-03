@@ -93,18 +93,6 @@ def edit_user_messages_success(user_name):  # +
     return f"Данные пользователь '{user_name}' обновлен."
 
 
-# def edit_user_messages_delete_group_error(user_name, group_name):
-#     return f"Ошибка при удалении группы '{group_name}' пользователю '{user_name}'"
-#
-#
-# def edit_user_messages_add_group_error(user_name, group_name):
-#     return f"Ошибка при добавлении группы '{group_name}' пользователю '{user_name}'"
-#
-#
-# def edit_user_messages_role_permissions(user_name, role_permissions):
-#     return f"Изменение прав доступа пользователя '{user_name}'. Обновленные права: '{role_permissions}'."
-#
-
 # УДАЛЕНИЕ ПОЬЗОВАТЕЛЯ
 def delete_user_messages_error(user_name):
     return f"Неудачная попытка при удалении пользователя '{user_name}' из базы данных, пользователь не может быть удален, так как существуют зависимые объекты в базе данных."

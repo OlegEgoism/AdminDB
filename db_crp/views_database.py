@@ -5,12 +5,8 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
 from django.db.backends.postgresql.base import DatabaseWrapper
 from django.conf import settings
-
 from db_backends.greenplum.base import DatabaseWrapper
-
-
-from .audit_views import connect_data_base_success, create_audit_log, delete_data_base_success, delete_data_base_error, update_data_base_success, \
-    sync_data_base_success, sync_data_base_error
+from .audit_views import connect_data_base_success, create_audit_log, delete_data_base_success, delete_data_base_error, update_data_base_success, sync_data_base_success, sync_data_base_error
 from .forms import DatabaseConnectForm
 from .models import ConnectingDB, UserLog, GroupLog, SettingsProject
 from django.core.paginator import Paginator
@@ -38,7 +34,6 @@ def database_list(request):
             'host': connection_info.host_db,
             'port': connection_info.port_db,
         }
-
         info = {
             "segments": [],
             "is_available": False,
@@ -48,7 +43,6 @@ def database_list(request):
             "modes": [],
             "error": None,
         }
-
         try:
             with psycopg2.connect(**temp_db_settings) as conn:
                 with conn.cursor() as cursor:
@@ -61,14 +55,12 @@ def database_list(request):
                     if not has_segments_view:
                         info["error"] = " Нет итнформации о сегментах"
                         return info
-
                     cursor.execute("""
                         SELECT content, role, preferred_role, status, mode, hostname, address, port
                         FROM gp_segment_configuration
                         ORDER BY content, role;
                     """)
                     rows = cursor.fetchall()
-
                     info["segments"] = [
                         {
                             "content": row[0],
@@ -82,18 +74,14 @@ def database_list(request):
                         }
                         for row in rows
                     ]
-
                     info["primary_count"] = sum(1 for row in rows if row[1] == 'p')
                     info["mirror_count"] = sum(1 for row in rows if row[1] == 'm')
                     info["statuses"] = sorted({row[3] for row in rows if row[3]})
                     info["modes"] = sorted({row[4] for row in rows if row[4]})
                     info["is_available"] = True
-
         except Exception as e:
             info["error"] = str(e)
-
         return info
-
     databases_info = [{"db": db, "segments": get_segments_info(db)} for db in page_obj]
     return render(request, "databases/database_list.html", {
         "databases_info": databases_info,
@@ -105,14 +93,11 @@ def database_list(request):
 @login_required
 def tables_list(request, db_id):
     """Список таблиц в выбранной базе данных (с отображением владельца таблиц)"""
-
     user_requester = request.user.username if request.user.is_authenticated else "Аноним"
     connection_info = get_object_or_404(ConnectingDB, id=db_id)
-
     db_settings = settings.DATABASES.get('default', {})
-
     temp_db_settings = {
-        'ENGINE': 'db_backends.greenplum',
+        'ENGINE': db_settings.get('ENGINE', 'django.db.backends.postgresql'),
         'NAME': connection_info.name_db,
         'USER': connection_info.user_db,
         'PASSWORD': connection_info.get_decrypted_password(),
@@ -125,16 +110,12 @@ def tables_list(request, db_id):
         'OPTIONS': db_settings.get('OPTIONS'),
         'TIME_ZONE': db_settings.get('TIME_ZONE'),
     }
-
     tables_info = []
     db_size = "Неизвестно"
-
     try:
         temp_connection = DatabaseWrapper(temp_db_settings, alias="temp_connection")
         temp_connection.connect()
-
         with temp_connection.cursor() as cursor:
-
             cursor.execute("""
                 SELECT
                     n.nspname AS schemaname,
@@ -151,9 +132,7 @@ def tables_list(request, db_id):
                   AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')
                 ORDER BY n.nspname, c.relname;
             """)
-
             rows = cursor.fetchall()
-
             tables_info = [
                 {
                     "schema": row[0],
@@ -164,27 +143,19 @@ def tables_list(request, db_id):
                 }
                 for row in rows
             ]
-
             cursor.execute(
                 f"SELECT pg_size_pretty(pg_database_size('{connection_info.name_db}'));"
             )
             db_size = cursor.fetchone()[0]
-
     except Exception as e:
         message = f"Ошибка при загрузке таблиц: {str(e)}"
         messages.error(request, message)
         tables_info = []
-
     finally:
         if 'temp_connection' in locals():
             temp_connection.close()
-
-    # ============================
-    # УНИКАЛЬНЫЕ схемы и авторы
-    # ============================
     schemas = sorted({t["schema"] for t in tables_info})
     owners = sorted({t["owner"] for t in tables_info if t["owner"]})
-
     return render(request, "databases/tables_info.html", {
         "db_name": connection_info.name_db,
         "db_size": db_size,
@@ -198,13 +169,10 @@ def tables_list(request, db_id):
 @login_required
 def delete_temp_table(request, db_id, schema_name, table_name):
     """Удаление временной таблицы (устойчиво к pg_temp_* особенностям)"""
-
     user_requester = request.user.username if request.user.is_authenticated else "Аноним"
-
     if request.method != "POST":
         messages.error(request, "Неподдерживаемый метод запроса")
         return redirect('tables_list', db_id=db_id)
-
     connection_info = get_object_or_404(ConnectingDB, id=db_id)
     temp_db_settings = {
         'dbname': connection_info.name_db,
@@ -213,7 +181,6 @@ def delete_temp_table(request, db_id, schema_name, table_name):
         'host': connection_info.host_db,
         'port': connection_info.port_db,
     }
-
     try:
         with psycopg2.connect(**temp_db_settings) as conn:
             with conn.cursor() as cursor:
