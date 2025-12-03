@@ -122,7 +122,7 @@ def audit_log_export(request):
             entry.username,
             entry.get_action_type_display(),
             entry.get_entity_type_display(),
-            entry.database_name or "",   # ← читаем уже из модели
+            entry.database_name or "",  # ← читаем уже из модели
             entry.entity_name or "",
             entry.details or "",
         ]
@@ -130,9 +130,6 @@ def audit_log_export(request):
             worksheet.write(row_num, col_num, str(cell_value) if cell_value else "")
     workbook.close()
     return response
-
-
-
 
 
 @login_required
