@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-
+from .models import ConnectingDB, GroupLog, SettingsProject, UserLog
 
 CustomUser = get_user_model()
 
@@ -36,3 +36,67 @@ class CustomUserRegistrationSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
         return user
+
+
+class ConnectingDBSerializer(serializers.ModelSerializer):
+    """Сериализатор подключения к базе данных."""
+
+    decrypted_password = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = ConnectingDB
+        fields = [
+            "id",
+            "info_db",
+            "name_db",
+            "user_db",
+            "password_db",
+            "host_db",
+            "port_db",
+            "created_at",
+            "updated_at",
+            "decrypted_password",
+        ]
+        extra_kwargs = {
+            "password_db": {"write_only": True},
+        }
+
+    def get_decrypted_password(self, obj):
+        return obj.get_decrypted_password()
+
+
+class GroupLogSerializer(serializers.ModelSerializer):
+    """Сериализатор групп, выгруженных из базы данных."""
+
+    class Meta:
+        model = GroupLog
+        fields = ["id", "groupname", "groupinfo", "created_at", "updated_at"]
+
+
+class UserLogSerializer(serializers.ModelSerializer):
+    """Сериализатор пользователей, выгруженных из базы данных."""
+
+    class Meta:
+        model = UserLog
+        fields = [
+            "id",
+            "username",
+            "email",
+            "can_create_db",
+            "is_superuser",
+            "inherit",
+            "create_role",
+            "login",
+            "replication",
+            "bypass_rls",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class SettingsProjectSerializer(serializers.ModelSerializer):
+    """Сериализатор настроек проекта."""
+
+    class Meta:
+        model = SettingsProject
+        fields = ["id", "pagination_size", "send_email", "created_at", "updated_at"]

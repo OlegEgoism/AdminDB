@@ -4,7 +4,19 @@ from django.contrib import admin
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from db_crp.views import home, register, logout_view
-from db_crp.api_views import RegisterAPIView, login_api, logout_api
+from db_crp.api_views import (
+    DatabaseDetailAPI,
+    DatabaseListAPI,
+    GroupLogAPI,
+    RegisterAPIView,
+    SettingsProjectAPI,
+    SyncUsersAndGroupsAPI,
+    TablesListAPI,
+    TemporaryTableDeleteAPI,
+    UserLogAPI,
+    login_api,
+    logout_api,
+)
 from db_crp.views_setting import settings_info, audit_log, audit_log_export, session_list, logout_user, settings_project, admin_info, admin_edit, admin_delete
 from db_crp.views_group import group_list, group_create, group_edit, group_delete, group_info, groups_edit_privileges_tables
 from db_crp.views_user import user_list, user_create, user_info, user_edit, user_delete
@@ -36,6 +48,19 @@ swagger_urlpatterns = [
 
     path('api/login/', login_api, name='api-login'),
     path('api/logout/', logout_api, name='api-logout'),
+
+    path('api/databases/', DatabaseListAPI.as_view(), name='api-database-list'),
+    path('api/databases/<int:db_id>/', DatabaseDetailAPI.as_view(), name='api-database-detail'),
+    path('api/databases/<int:db_id>/tables/', TablesListAPI.as_view(), name='api-database-tables'),
+    path(
+        'api/databases/<int:db_id>/tables/<str:schema_name>/<str:table_name>/',
+        TemporaryTableDeleteAPI.as_view(),
+        name='api-database-table-delete',
+    ),
+    path('api/databases/<int:db_id>/sync/', SyncUsersAndGroupsAPI.as_view(), name='api-database-sync'),
+    path('api/settings/', SettingsProjectAPI.as_view(), name='api-settings'),
+    path('api/users/', UserLogAPI.as_view(), name='api-users-log'),
+    path('api/groups/', GroupLogAPI.as_view(), name='api-groups-log'),
 
 
 ]
