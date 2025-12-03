@@ -5,8 +5,39 @@
     <div class="welcome-container">
         <div class="title-with-button" style="display: flex; align-items: center; justify-content: space-between;">
             <h2 class="welcome-title">Список баз данных ({{ databases_info|length }} шт.)</h2>
-            <a href="{% url 'database_connect' %}" class="btn btn-save">Создать новое подключение</a>
+
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <!-- Поиск -->
+                <form method="get" action="" class="search-form" id="searchForm" style="position: relative;">
+                    <input type="text"
+                           id="databaseSearch"
+                           name="search"
+                           class="group-search"
+                           value="{{ search_query }}"
+                           placeholder="Поиск базы данных..."
+                           oninput="filterDatabases(); toggleClearButton()"/>
+
+                    <!-- Кнопка очистки -->
+                    <span id="clearSearchBtn"
+                          onclick="clearSearch()"
+                          style="
+                      position: absolute;
+                      right: 8px;
+                      top: 50%;
+                      transform: translateY(-50%);
+                      cursor: pointer;
+                      font-size: 16px;
+                      color: #e81717;
+                      display: none;
+                  ">
+                &#10006;
+            </span>
+                </form>
+
+                <a href="{% url 'database_connect' %}" class="btn btn-save">Создать новое подключение</a>
+            </div>
         </div>
+
         <hr>
 
         <!-- Вывод сообщений -->
@@ -20,11 +51,7 @@
             </div>
         {% endif %}
 
-        <!-- Поле поиска -->
-        <form method="get" action="" class="search-form" id="searchForm">
-            <input type="text" id="databaseSearch" name="search" class="group-search" value="{{ search_query }}"
-                   placeholder="Поиск базы данных..." onkeyup="debounceSearch()"/>
-        </form>
+
 
         <div id="databaseList">
             {% for item in databases_info %}
@@ -86,15 +113,49 @@
         </div>
     </div>
 
-    {#    <script>#}
-    {#        let timeout = null;#}
-    {##}
-    {#        // Функция для дебаунсинга#}
-    {#        function debounceSearch() {#}
-    {#            clearTimeout(timeout);#}
-    {#            timeout = setTimeout(function() {#}
-    {#                document.getElementById('searchForm').submit();#}
-    {#            }, 1000); // задержка 500 миллисекунд#}
-    {#        }#}
-    {#    </script>#}
+    <script>
+        function filterDatabases() {
+            let input = document.getElementById("databaseSearch").value.toLowerCase();
+            let items = document.querySelectorAll("#databaseList .group-item");
+
+            items.forEach(item => {
+                let info = item.querySelector(".group-dates a")?.textContent.toLowerCase() || "";
+                let name = item.querySelector(".group-name")?.textContent.toLowerCase() || "";
+                let host = item.querySelectorAll(".group-dates small")[2]?.textContent.toLowerCase() || "";
+                let port = item.querySelectorAll(".group-dates small")[3]?.textContent.toLowerCase() || "";
+
+                if (
+                    info.includes(input) ||
+                    name.includes(input) ||
+                    host.includes(input) ||
+                    port.includes(input)
+                ) {
+                    item.style.display = "";
+                } else {
+                    item.style.display = "none";
+                }
+            });
+        }
+
+        function toggleClearButton() {
+            const input = document.getElementById("databaseSearch");
+            const btn = document.getElementById("clearSearchBtn");
+
+            btn.style.display = input.value.trim() !== "" ? "block" : "none";
+        }
+
+        function clearSearch() {
+            const input = document.getElementById("databaseSearch");
+            input.value = "";
+            toggleClearButton();
+            filterDatabases();
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            toggleClearButton();
+            filterDatabases(); // если уже был search_query
+        });
+    </script>
+
+
 {% endblock %}

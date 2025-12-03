@@ -5,7 +5,38 @@
     <div class="welcome-container">
         <div class="title-with-button" style="display: flex; align-items: center; justify-content: space-between;">
             <h2 class="welcome-title">Список пользователей ({{ users_data|length }} шт.)</h2>
-            <a href="{% url 'user_create' db_id=db_id %}" class="btn btn-save">Создать пользователя</a>
+
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <!-- Поиск -->
+                <form method="get" action="" class="search-form" id="searchForm" style="position: relative;">
+                    <input type="text"
+                           id="userSearch"
+                           name="search"
+                           class="user-search"
+                           value="{{ request.GET.search }}"
+                           placeholder="Поиск пользователя..."
+                           style="width: 320px;"
+                           oninput="filterUsers(); toggleClearButton()"/>
+
+                    <!-- Кнопка очистки -->
+                    <span id="clearSearchBtn"
+                          onclick="clearSearch()"
+                          style="
+                              position: absolute;
+                              right: 8px;
+                              top: 50%;
+                              transform: translateY(-50%);
+                              cursor: pointer;
+                              font-size: 16px;
+                              color: #e81717;
+                              display: none;
+                          ">
+                        &#10006;
+                    </span>
+                </form>
+
+                <a href="{% url 'user_create' db_id=db_id %}" class="btn btn-save">Создать пользователя</a>
+            </div>
         </div>
         <hr>
 
@@ -20,12 +51,6 @@
                 {% endfor %}
             </div>
         {% endif %}
-
-        <!-- Поле поиска -->
-        <form method="get" action="" class="search-form">
-            <input type="text" id="userSearch" name="search" class="user-search" value="{{ request.GET.search }}"
-                   placeholder="Поиск пользователя..."/>
-        </form>
 
         <div id="userList">
             {% for user in users_data %}
@@ -57,11 +82,12 @@
                            onclick="return confirm('Удалить пользователя {{ user.username }} из базы?')">Удалить</a>
                     </div>
                 </div>
-            {% empty %}
+                {% empty %}
                 <li>Нет пользователей</li>
             {% endfor %}
         </div>
         <br>
+
         <!-- Пагинация -->
         <div class="pagination">
             {% if page_obj.has_previous %}
@@ -79,4 +105,40 @@
             <a href="{% url 'database_list' %}" class="btn btn-cancel">Назад</a>
         </div>
     </div>
+
+    <script>
+        function filterUsers() {
+            let input = document.getElementById("userSearch").value.toLowerCase();
+            let items = document.querySelectorAll("#userList .group-item");
+
+            items.forEach(item => {
+                let username = item.querySelector(".group-link-user")?.textContent.toLowerCase() || "";
+                let email = item.querySelectorAll(".group-name small")[0]?.textContent.toLowerCase() || "";
+
+                if (username.includes(input) || email.includes(input)) {
+                    item.style.display = "";
+                } else {
+                    item.style.display = "none";
+                }
+            });
+        }
+
+        function toggleClearButton() {
+            const input = document.getElementById("userSearch");
+            const btn = document.getElementById("clearSearchBtn");
+            btn.style.display = input.value.trim() !== "" ? "block" : "none";
+        }
+
+        function clearSearch() {
+            const input = document.getElementById("userSearch");
+            input.value = "";
+            toggleClearButton();
+            filterUsers();
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            toggleClearButton();
+            filterUsers(); // Применить фильтр при загрузке (если есть search-запрос)
+        });
+    </script>
 {% endblock %}

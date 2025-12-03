@@ -129,6 +129,7 @@ textarea,
 .audit-search,
 .o-button,
 .d-button {
+    min-width: 320px;
     width: 100%;
     padding: 10px 12px;
     border: 1px solid var(--border);
@@ -492,4 +493,8 @@ textarea:focus,
     outline: none;
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.2);
+}
+
+.user-search {
+    width: 320px;
 }
