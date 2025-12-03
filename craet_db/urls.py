@@ -4,68 +4,15 @@ from django.contrib import admin
 from django.urls import path
 from django.contrib.auth import views as auth_views
 from db_crp.views import home, register, logout_view
-from db_crp.api_views import (
-    DatabaseDetailAPI,
-    DatabaseListAPI,
-    GroupLogAPI,
-    RegisterAPIView,
-    SettingsProjectAPI,
-    SyncUsersAndGroupsAPI,
-    TablesListAPI,
-    TemporaryTableDeleteAPI,
-    UserLogAPI,
-    login_api,
-    logout_api,
-)
 from db_crp.views_setting import settings_info, audit_log, audit_log_export, session_list, logout_user, settings_project, admin_info, admin_edit, admin_delete
 from db_crp.views_group import group_list, group_create, group_edit, group_delete, group_info, groups_edit_privileges_tables
 from db_crp.views_user import user_list, user_create, user_info, user_edit, user_delete
 from db_crp.views_database import database_list, tables_list, database_connect, database_edit, database_delete, sync_users_and_groups, delete_temp_table
-from rest_framework import permissions
-from drf_yasg.views import get_schema_view
-from drf_yasg import openapi
-
-schema_view = get_schema_view(
-    openapi.Info(
-        title="Snippets API",
-        default_version='v1',
-        description="Test description",
-        terms_of_service="https://www.google.com/policies/terms/",
-        contact=openapi.Contact(email="contact@snippets.local"),
-        license=openapi.License(name="BSD License"),
-    ),
-    public=True,
-    permission_classes=(permissions.AllowAny,),
-)
 
 
-swagger_urlpatterns = [
-    path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
-    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
-
-    path('api/register/', RegisterAPIView.as_view(), name='api_register'),
-
-    path('api/login/', login_api, name='api-login'),
-    path('api/logout/', logout_api, name='api-logout'),
-
-    path('api/databases/', DatabaseListAPI.as_view(), name='api-database-list'),
-    path('api/databases/<int:db_id>/', DatabaseDetailAPI.as_view(), name='api-database-detail'),
-    path('api/databases/<int:db_id>/tables/', TablesListAPI.as_view(), name='api-database-tables'),
-    path(
-        'api/databases/<int:db_id>/tables/<str:schema_name>/<str:table_name>/',
-        TemporaryTableDeleteAPI.as_view(),
-        name='api-database-table-delete',
-    ),
-    path('api/databases/<int:db_id>/sync/', SyncUsersAndGroupsAPI.as_view(), name='api-database-sync'),
-    path('api/settings/', SettingsProjectAPI.as_view(), name='api-settings'),
-    path('api/users/', UserLogAPI.as_view(), name='api-users-log'),
-    path('api/groups/', GroupLogAPI.as_view(), name='api-groups-log'),
 
 
-]
-
-urlpatterns = swagger_urlpatterns + [
+urlpatterns = [
     path('admin/', admin.site.urls),  # Админка
     path('', home, name='home'),  # Главная
     path('register/', register, name='register'),  # Регистрация пользователя
