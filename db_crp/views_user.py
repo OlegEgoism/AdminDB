@@ -21,7 +21,6 @@ updated_at = timezone.now()
 
 @login_required
 def user_list(request, db_id):
-    """Список пользователей с пагинацией и полным поиском"""
     user_requester = request.user.username if request.user.is_authenticated else "Аноним"
     pagination_size = SettingsProject.objects.first().pagination_size if SettingsProject.objects.exists() else 20
     connection_info = get_object_or_404(ConnectingDB, id=db_id)
@@ -32,36 +31,41 @@ def user_list(request, db_id):
         'host': connection_info.host_db,
         'port': connection_info.port_db,
     }
+    search_query = request.GET.get('search', '').strip()
     users_data = []
-    search_query = request.GET.get('search', '')
     try:
-        conn = psycopg2.connect(**temp_db_settings)
-        cursor = conn.cursor()
-        cursor.execute("SELECT usename FROM pg_catalog.pg_user;")
-        users = sorted([user[0] for user in cursor.fetchall()])
-        user_logs = {log.username: log for log in UserLog.objects.filter(username__in=users)}
-        for user in users:
-            cursor.execute("""
-                SELECT COUNT(*)
-                FROM pg_user u
-                JOIN pg_auth_members m ON u.usesysid = m.member
-                JOIN pg_roles r ON m.roleid = r.oid
-                WHERE u.usename = %s;
-            """, [user])
-            group_count = cursor.fetchone()[0]
-            user_data = {
-                "username": user,
-                "created_at": user_logs[user].created_at if user in user_logs else None,
-                "updated_at": user_logs[user].updated_at if user in user_logs else None,
-                "group_count": group_count,
-                "email": user_logs[user].email if user in user_logs else None,
-            }
-            if search_query:
-                if not any(search_query.lower() in str(value).lower() for value in user_data.values()):
-                    continue
-            users_data.append(user_data)
-        cursor.close()
-        conn.close()
+        with psycopg2.connect(**temp_db_settings) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT usename FROM pg_catalog.pg_user;")
+                all_users = sorted([user[0] for user in cursor.fetchall()])
+                user_logs = {log.username: log for log in UserLog.objects.filter(username__in=all_users)}
+                for username in all_users:
+                    cursor.execute("""
+                        SELECT COUNT(*)
+                        FROM pg_user u
+                        JOIN pg_auth_members m ON u.usesysid = m.member
+                        JOIN pg_roles r ON m.roleid = r.oid
+                        WHERE u.usename = %s;
+                    """, (username,))
+                    group_count = cursor.fetchone()[0]
+                    log = user_logs.get(username)
+                    user_data = {
+                        "username": username,
+                        "created_at": log.created_at if log else None,
+                        "updated_at": log.updated_at if log else None,
+                        "group_count": group_count,
+                        "email": log.email if log else None,
+                    }
+                    if search_query:
+                        found = False
+                        for value in user_data.values():
+                            if value is not None and search_query.lower() in str(value).lower():
+                                found = True
+                                break
+                        if not found:
+                            continue
+
+                    users_data.append(user_data)
         paginator = Paginator(users_data, pagination_size)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
@@ -69,11 +73,10 @@ def user_list(request, db_id):
         message = user_error()
         messages.error(request, f"{message}: {str(e)}")
         create_audit_log(user_requester, 'info', 'create', user_requester, f"{message}: {str(e)}", database_name=connection_info.name_db)
-        page_obj = []  # Добавлено дефолтное значение для page_obj
+        page_obj = Paginator([], pagination_size).get_page(1)
     return render(request, 'users/user_list.html', {
-        'users_data': page_obj.object_list if isinstance(page_obj, Paginator) else page_obj,
         'page_obj': page_obj,
-        'db_id': db_id
+        'db_id': db_id,
     })
 
 
