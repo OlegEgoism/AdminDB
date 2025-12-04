@@ -64,7 +64,6 @@ def user_list(request, db_id):
                                 break
                         if not found:
                             continue
-
                     users_data.append(user_data)
         paginator = Paginator(users_data, pagination_size)
         page_number = request.GET.get('page')
