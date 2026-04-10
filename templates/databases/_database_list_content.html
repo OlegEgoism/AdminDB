@@ -1,0 +1,29 @@
+<div id="databaseListWrapper">
+    <div id="databaseList">
+        {% for item in databases_info %}
+            <div class="group-item">
+                <div class="group-number"><strong>{{ forloop.counter }}.</strong></div>
+                <div class="group-name">
+                    <a href="{% url 'tables_list' item.db.id %}" class="group-link-user">{{ item.db.name_db }}</a>
+                </div>
+                <div class="group-dates">
+                    <small>Создан: {% if item.db.created_at %}{{ item.db.created_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}</small>
+                    <small>Изменен: {% if item.db.updated_at %}{{ item.db.updated_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}</small>
+                </div>
+                <div class="group-dates">
+                    <small>Хост: {{ item.db.host_db }}</small>
+                    <small>Порт: {{ item.db.port_db }}</small>
+                </div>
+                <div class="user-action">
+                    <a href="{% url 'group_list' db_id=item.db.id %}" class="btn btn-edit">Группы</a>
+                    <a href="{% url 'user_list' db_id=item.db.id %}" class="btn btn-edit">Пользователи</a>
+                    <a href="{% url 'sync_users_groups' db_id=item.db.id %}" class="btn btn-save">Синхронизация</a>
+                    <a href="{% url 'database_edit' item.db.id %}" class="btn btn-edit">Редактировать</a>
+                    <a href="{% url 'database_delete' item.db.id %}" class="btn btn-delete" onclick="return confirm('Удалить подключение {{ item.db.name_db }}?')">Удалить</a>
+                </div>
+            </div>
+        {% empty %}
+            <li>Нет доступных баз данных</li>
+        {% endfor %}
+    </div>
+</div>

@@ -15,6 +15,7 @@ from .audit_views import delete_user_messages_email, delete_user_messages_succes
     create_user_messages_error_email, create_user_messages_success, create_user_messages_email, user_info_error, edit_user_messages_success, \
     edit_user_messages_delete_group_success, edit_user_messages_add_group_success, user_error, create_user_error, create_user_messages_email_error, \
     user_info_all_error, edit_user_messages_db_error, user_data_log
+from .htmx import render_htmx
 
 created_at = datetime(2000, 1, 1, 0, 0)
 updated_at = timezone.now()
@@ -25,6 +26,7 @@ def user_list(request, db_id):
     """Список пользователей"""
     user_requester = request.user.username if request.user.is_authenticated else "Аноним"
     temp_db_settings = get_db_connection_settings(db_id)
+    search_query = request.GET.get("q", "").strip().lower()
     users_data = []
     try:
         conn = psycopg2.connect(**temp_db_settings)
@@ -33,6 +35,8 @@ def user_list(request, db_id):
         users = sorted([user[0] for user in cursor.fetchall()])
         user_logs = {log.username: log for log in UserLog.objects.filter(username__in=users)}
         for user in users:
+            if search_query and search_query not in user.lower():
+                continue
             cursor.execute("""
                 SELECT COUNT(*)
                 FROM pg_user u
@@ -54,10 +58,11 @@ def user_list(request, db_id):
         message = user_error()
         messages.error(request, f"{message}: {str(e)}")
         create_audit_log(user_requester, 'info', 'create', user_requester, f"{message}: {str(e)}")
-    return render(request, 'users/user_list.html', {
+    return render_htmx(request, 'users/user_list.html', {
         'users_data': users_data,
-        'db_id': db_id
-    })
+        'db_id': db_id,
+        'search_query': search_query
+    }, partial_template='users/_user_list_content.html')
 
 
 @login_required

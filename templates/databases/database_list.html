@@ -9,68 +9,17 @@
         </div>
         <hr>
 
-        <!-- Вывод сообщений -->
-        {% if messages %}
-            <div class="messages">
-                {% for message in messages %}
-                    <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-error{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
+        <input type="text"
+               name="q"
+               class="group-search"
+               value="{{ search_query }}"
+               placeholder="Поиск базы данных..."
+               hx-get="{% url 'database_list' %}"
+               hx-trigger="keyup changed delay:300ms"
+               hx-target="#databaseListWrapper"
+               hx-select="#databaseListWrapper"
+               hx-include="[name='q']">
 
-        <!-- Поле поиска -->
-        <input type="text" id="databaseSearch" class="group-search" onkeyup="filterDatabases()"
-               placeholder="Поиск базы данных..."/>
-
-        <div id="databaseList">
-            {% for item in databases_info %}
-                <div class="group-item">
-                    <div class="group-number">
-                        <strong>{{ forloop.counter }}.</strong>
-                    </div>
-                    <div class="group-name">
-                        <a href="{% url 'tables_list' item.db.id %}" class="group-link-user">{{ item.db.name_db }}</a>
-                    </div>
-                    <div class="group-dates">
-                        <small>Создан: {% if item.db.created_at %}{{ item.db.created_at|date:"d.m.Y H:i" }}{% else %}
-                            —{% endif %}</small>
-                        <small>Изменен: {% if item.db.updated_at %}{{ item.db.updated_at|date:"d.m.Y H:i" }}{% else %}
-                            —{% endif %}</small>
-                    </div>
-                    <div class="group-dates">
-                        <small>Хост: {{ item.db.host_db }}</small>
-                        <small>Порт: {{ item.db.port_db }}</small>
-                    </div>
-                    <div class="user-action">
-                        <a href="{% url 'group_list' db_id=item.db.id %}" class="btn btn-edit">Группы</a>
-                        <a href="{% url 'user_list' db_id=item.db.id %}" class="btn btn-edit">Пользователи</a>
-                        <a href="{% url 'sync_users_groups' db_id=item.db.id %}" class="btn btn-save">Синхронизация</a>
-                        <a href="{% url 'database_edit' item.db.id %}" class="btn btn-edit">Редактировать</a>
-                        <a href="{% url 'database_delete' item.db.id %}" class="btn btn-delete"
-                           onclick="return confirm('Удалить подключение {{ item.db.name_db }}?')">Удалить</a>
-                    </div>
-                </div>
-            {% empty %}
-                <li>Нет доступных баз данных</li>
-            {% endfor %}
-        </div>
+        {% include 'databases/_database_list_content.html' %}
     </div>
-
-    <script>
-        function filterDatabases() {
-            let input = document.getElementById("databaseSearch");
-            let filter = input.value.toLowerCase();
-            let items = document.querySelectorAll(".group-item");
-            items.forEach(item => {
-                let dbName = item.querySelector(".group-name a").textContent.toLowerCase();
-                if (dbName.includes(filter)) {
-                    item.style.display = "";
-                } else {
-                    item.style.display = "none";
-                }
-            });
-        }
-    </script>
 {% endblock %}

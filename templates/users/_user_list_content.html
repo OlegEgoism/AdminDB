@@ -1,0 +1,26 @@
+<div id="userListWrapper">
+    <div id="userList">
+        {% for user in users_data %}
+            <div class="group-item">
+                <div class="group-number"><strong>{{ forloop.counter }}. </strong></div>
+                <div class="group-name">
+                    <a href="{% url 'user_info' db_id=db_id username=user.username %}" class="group-link-user">{{ user.username }}</a>
+                </div>
+                <div class="group-dates">
+                    <small>Создан: {% if user.created_at %}{{ user.created_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}</small>
+                    <small>Изменен: {% if user.updated_at %}{{ user.updated_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}</small>
+                </div>
+                <div class="group-name">
+                    <small>Почта: {% if user.email %}{{ user.email }}{% else %}<span class="no-email">Не указана</span>{% endif %}</small>
+                </div>
+                <div class="group-user-count"><small>Групп: {{ user.group_count }} шт.</small></div>
+                <div class="user-actions">
+                    <a href="{% url 'user_edit' db_id=db_id username=user.username %}" class="btn btn-edit">Редактировать</a>
+                    <a href="{% url 'user_delete' db_id=db_id username=user.username %}" class="btn btn-delete" onclick="return confirm('Удалить пользователя {{ user.username }} из базы?')">Удалить</a>
+                </div>
+            </div>
+        {% empty %}
+            <li>Нет пользователей</li>
+        {% endfor %}
+    </div>
+</div>
