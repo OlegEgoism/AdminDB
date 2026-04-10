@@ -9,74 +9,21 @@
         </div>
         <hr>
 
-        <!-- Вывод сообщений -->
-        {% if messages %}
-            <div class="messages">
-                {% for message in messages %}
-                    <div class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-error{% endif %}">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
+        <input type="text"
+               name="q"
+               class="group-search"
+               value="{{ search_query }}"
+               placeholder="Поиск группы..."
+               hx-get="{% url 'group_list' db_id=db_id %}"
+               hx-trigger="keyup changed delay:300ms"
+               hx-target="#groupListWrapper"
+               hx-select="#groupListWrapper"
+               hx-include="[name='q']">
 
-        <!-- Поле поиска -->
-        <input type="text" id="groupSearch" class="group-search" onkeyup="filterGroups()"
-               placeholder="Поиск группы..."/>
+        {% include 'groups/_group_list_content.html' %}
 
-        <div id="groupList">
-            {% for group in user_groups_data %}
-                <div class="group-item">
-                    <div class="group-number">
-                        <strong>{{ forloop.counter }}.</strong>
-                    </div>
-                    <div class="group-name">
-                        <a href="{% url 'group_info' db_id=db_id group_name=group.groupname %}" class="group-link-user">
-                            {{ group.groupname }}
-                        </a>
-                    </div>
-                    <div class="group-dates">
-                        <small>Создан: {% if group.created_at %}{{ group.created_at|date:"d.m.Y H:i" }}{% else %}
-                            —{% endif %}</small>
-                        <small>Изменен: {% if group.updated_at %}{{ group.updated_at|date:"d.m.Y H:i" }}{% else %}
-                            —{% endif %}</small>
-                    </div>
-                    <div class="group-user-count">
-                        <small>Пользователей: {{ group.user_count }} шт.</small>
-                    </div>
-                    <div class="user-action">
-                        <a href="{% url 'group_edit' db_id=db_id group_name=group.groupname %}" class="btn btn-edit">Редактировать</a>
-                        <a href="{% url 'groups_edit_privileges_tables' db_id=db_id group_name=group.groupname %}"
-                           class="btn btn-edit">Доступ</a>
-                        <a href="{% url 'group_delete' db_id=db_id group_name=group.groupname %}"
-                           class="btn btn-delete"
-                           onclick="return confirm('Удалить группу {{ group.groupname }}?')">
-                            Удалить
-                        </a>
-                    </div>
-                </div>
-            {% empty %}
-                <li>Нет пользовательских групп</li>
-            {% endfor %}
-        </div>
         <div class="all-btn">
             <a href="{% url 'database_list' %}" class="btn btn-cancel">Назад</a>
         </div>
     </div>
-
-    <script>
-        function filterGroups() {
-            let input = document.getElementById("groupSearch");
-            let filter = input.value.toLowerCase();
-            let items = document.querySelectorAll(".group-item");
-            items.forEach(item => {
-                let groupName = item.querySelector(".group-name a").textContent.toLowerCase();
-                if (groupName.includes(filter)) {
-                    item.style.display = "";
-                } else {
-                    item.style.display = "none";
-                }
-            });
-        }
-    </script>
 {% endblock %}

@@ -9,18 +9,25 @@ from .audit_views import connect_data_base_success, create_audit_log, delete_dat
 from .forms import DatabaseConnectForm
 from .models import ConnectingDB, UserLog, GroupLog
 from django.db.utils import OperationalError
+from .htmx import render_htmx
 
 
 @login_required
 def database_list(request):
     """Список баз данных"""
-    databases = ConnectingDB.objects.all()
+    search_query = request.GET.get("q", "").strip()
+    databases = ConnectingDB.objects.all().order_by("name_db")
+    if search_query:
+        databases = databases.filter(name_db__icontains=search_query)
     databases_info = []
     for db in databases:
         databases_info.append({
             "db": db,
         })
-    return render(request, "databases/database_list.html", {"databases_info": databases_info})
+    return render_htmx(request, "databases/database_list.html", {
+        "databases_info": databases_info,
+        "search_query": search_query,
+    }, partial_template="databases/_database_list_content.html")
 
 
 @login_required

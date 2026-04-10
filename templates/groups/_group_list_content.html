@@ -1,0 +1,24 @@
+<div id="groupListWrapper">
+    <div id="groupList">
+        {% for group in user_groups_data %}
+            <div class="group-item">
+                <div class="group-number"><strong>{{ forloop.counter }}.</strong></div>
+                <div class="group-name">
+                    <a href="{% url 'group_info' db_id=db_id group_name=group.groupname %}" class="group-link-user">{{ group.groupname }}</a>
+                </div>
+                <div class="group-dates">
+                    <small>Создан: {% if group.created_at %}{{ group.created_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}</small>
+                    <small>Изменен: {% if group.updated_at %}{{ group.updated_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}</small>
+                </div>
+                <div class="group-user-count"><small>Пользователей: {{ group.user_count }} шт.</small></div>
+                <div class="user-action">
+                    <a href="{% url 'group_edit' db_id=db_id group_name=group.groupname %}" class="btn btn-edit">Редактировать</a>
+                    <a href="{% url 'groups_edit_privileges_tables' db_id=db_id group_name=group.groupname %}" class="btn btn-edit">Доступ</a>
+                    <a href="{% url 'group_delete' db_id=db_id group_name=group.groupname %}" class="btn btn-delete" onclick="return confirm('Удалить группу {{ group.groupname }}?')">Удалить</a>
+                </div>
+            </div>
+        {% empty %}
+            <li>Нет пользовательских групп</li>
+        {% endfor %}
+    </div>
+</div>

@@ -13,6 +13,7 @@ from .forms import CreateGroupForm, GroupEditForm
 from django.shortcuts import render, redirect, get_object_or_404
 from .models import GroupLog, ConnectingDB
 from django.contrib import messages
+from .htmx import render_htmx
 
 created_at = datetime(2000, 1, 1, 0, 0)
 updated_at = timezone.now()
@@ -23,6 +24,7 @@ def group_list(request, db_id):
     """Список групп"""
     user_requester = request.user.username if request.user.is_authenticated else "Аноним"
     temp_db_settings = get_db_connection_settings(db_id)
+    search_query = request.GET.get("q", "").strip().lower()
     user_groups_data = []
     try:
         conn = psycopg2.connect(**temp_db_settings)
@@ -33,6 +35,8 @@ def group_list(request, db_id):
             WHERE rolcanlogin = FALSE AND rolname NOT LIKE 'pg_%';  
         """)
         group_names = [group[0] for group in cursor.fetchall()]
+        if search_query:
+            group_names = [group for group in group_names if search_query in group.lower()]
         group_user_counts = {}
         for group in group_names:
             cursor.execute("""
@@ -56,10 +60,11 @@ def group_list(request, db_id):
         message = f"Ошибка подключения к группам: {str(e)}"
         messages.error(request, message)
         create_audit_log(user_requester, 'info', 'group', user_requester, f"{message}: {str(e)}")
-    return render(request, 'groups/group_list.html', {
+    return render_htmx(request, 'groups/group_list.html', {
         'user_groups_data': user_groups_data,
-        'db_id': db_id
-    })
+        'db_id': db_id,
+        'search_query': search_query
+    }, partial_template='groups/_group_list_content.html')
 
 
 @login_required

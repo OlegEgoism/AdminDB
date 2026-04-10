@@ -6,9 +6,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Главная{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
 </head>
 
-<body>
+<body hx-boost="true"
+      hx-target="#app-content"
+      hx-select="#app-content"
+      hx-swap="innerHTML show:top"
+      hx-push-url="true">
 <header>
     <nav>
         <a href="/">Главная</a>
@@ -18,17 +23,16 @@
                 <a href="{% url 'audit_log' %}">Аудит</a>
                 <a href="{% url 'settings_info' %}">Настройки</a>
             {% endif %}
-            <a href="{% url 'logout' %}">Выйти</a>
+            <a href="{% url 'logout' %}" hx-boost="false">Выйти</a>
         {% else %}
             <a href="{% url 'login' %}">Войти</a>
             <a href="{% url 'register' %}">Регистрация</a>
         {% endif %}
     </nav>
 </header>
-<main>
+<main id="app-content">
+    {% include 'partials/messages.html' %}
     {% block content %}{% endblock %}
 </main>
 </body>
 </html>
-
-
